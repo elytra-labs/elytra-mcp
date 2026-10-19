@@ -1,5 +1,5 @@
-import React, { useId, useRef, useState } from 'react';
-import { Check, Copy, X } from 'lucide-react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { Check, ChevronDown, Copy, X } from 'lucide-react';
 import { copyText, decisionMeta, toolLabel, type Tone } from '../lib/format';
 import { useDialogFocus } from '../lib/useDialogFocus';
 
@@ -127,6 +127,144 @@ export function Stat({
         {unit && <span className="stat-unit">{unit}</span>}
       </div>
       {hint && <div className="stat-hint">{hint}</div>}
+    </div>
+  );
+}
+
+/* ---------- Select ---------- */
+
+/** A themed single-choice listbox. Native selects draw the operating system's menu, which ignores the theme. */
+export function Select<T extends string>({
+  value,
+  onChange,
+  options,
+  label,
+  className = '',
+  disabled = false,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: string }[];
+  /** Accessible name; also used by the visible field label when one wraps the control. */
+  label: string;
+  className?: string;
+  disabled?: boolean;
+}) {
+  const id = useId();
+  const wrap = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const typed = useRef({ text: '', at: 0 });
+  const [open, setOpen] = useState(false);
+  const selected = Math.max(0, options.findIndex((o) => o.value === value));
+  const [active, setActive] = useState(selected);
+
+  useEffect(() => {
+    if (!open) return;
+    list.current?.focus();
+    const outside = (event: PointerEvent) => {
+      if (!wrap.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', outside);
+    return () => document.removeEventListener('pointerdown', outside);
+  }, [open]);
+  useEffect(() => {
+    if (open) list.current?.querySelector<HTMLElement>(`[data-index="${active}"]`)?.scrollIntoView({ block: 'nearest' });
+  }, [open, active]);
+
+  const show = (index = selected) => {
+    setActive(index);
+    setOpen(true);
+  };
+  const close = (refocus = true) => {
+    setOpen(false);
+    if (refocus) button.current?.focus();
+  };
+  const choose = (index: number) => {
+    const option = options[index];
+    if (option && option.value !== value) onChange(option.value);
+    close();
+  };
+  const typeahead = (key: string) => {
+    const now = Date.now();
+    typed.current = { text: (now - typed.current.at < 700 ? typed.current.text : '') + key.toLowerCase(), at: now };
+    const match = options.findIndex((o) => o.label.toLowerCase().startsWith(typed.current.text));
+    if (match >= 0) setActive(match);
+  };
+  const onListKey = (event: React.KeyboardEvent) => {
+    const last = options.length - 1;
+    const keys: Record<string, () => void> = {
+      ArrowDown: () => setActive((i) => Math.min(last, i + 1)),
+      ArrowUp: () => setActive((i) => Math.max(0, i - 1)),
+      Home: () => setActive(0),
+      End: () => setActive(last),
+      Enter: () => choose(active),
+      ' ': () => choose(active),
+      Escape: () => close(),
+      Tab: () => close(false),
+    };
+    const handler = keys[event.key];
+    if (handler) {
+      if (event.key !== 'Tab') event.preventDefault();
+      handler();
+    } else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey) {
+      typeahead(event.key);
+    }
+  };
+
+  return (
+    <div className={`select-wrap ${className}`} ref={wrap}>
+      <button
+        type="button"
+        ref={button}
+        className="select select-button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? `${id}-list` : undefined}
+        aria-label={`${label}: ${options[selected]?.label ?? ''}`}
+        disabled={disabled}
+        onClick={() => (open ? close() : show())}
+        onKeyDown={(event) => {
+          if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
+            event.preventDefault();
+            show(event.key === 'ArrowUp' ? Math.max(0, selected - 1) : selected);
+          }
+        }}
+      >
+        <span className="select-value">{options[selected]?.label}</span>
+        <ChevronDown size={14} aria-hidden="true" />
+      </button>
+      {open && (
+        <ul
+          id={`${id}-list`}
+          ref={list}
+          role="listbox"
+          tabIndex={-1}
+          aria-label={label}
+          aria-activedescendant={`${id}-${active}`}
+          className="select-list"
+          onKeyDown={onListKey}
+          onBlur={(event) => {
+            if (!wrap.current?.contains(event.relatedTarget as Node)) setOpen(false);
+          }}
+        >
+          {options.map((option, index) => (
+            <li
+              key={option.value}
+              id={`${id}-${index}`}
+              data-index={index}
+              role="option"
+              aria-selected={index === selected}
+              className={index === active ? 'active' : ''}
+              onPointerMove={() => setActive(index)}
+              onClick={() => choose(index)}
+            >
+              <span>{option.label}</span>
+              {index === selected && <Check size={13} aria-hidden="true" />}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

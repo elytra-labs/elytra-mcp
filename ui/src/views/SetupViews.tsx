@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, FileJson2, FlaskConical, Info, Play, RefreshCw, Search, Server, Terminal } from 'lucide-react';
-import { Badge, Card, Chain, Code, Empty, PageHeader, Sheet, SkeletonRows, Stat } from '../components/ui';
+import { Badge, Card, Chain, Code, Empty, PageHeader, Select, Sheet, SkeletonRows, Stat } from '../components/ui';
 import { api, type WrapResult } from '../lib/api';
 import { fullDate, humanize, ms, pct, prettyJson, scenarioNumber, scenarioTitle } from '../lib/format';
 import { useStore } from '../lib/store';
@@ -95,10 +95,7 @@ export function ServersView() {
 
       <div className="setup-toolbar toolbar">
         <div className="input-wrap setup-search"><Search size={14} /><input className="input" aria-label="Search servers" placeholder="Search servers or commands…" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
-        <select className="select setup-filter" aria-label="Filter by host" value={host} onChange={(e) => setHost(e.target.value)}>
-          <option value="all">All hosts</option>
-          {hosts.map((name) => <option key={name} value={name}>{name}</option>)}
-        </select>
+        <Select className="setup-filter" label="Filter by host" value={host} onChange={setHost} options={[{ value: 'all', label: 'All hosts' }, ...hosts.map((name) => ({ value: name, label: name }))]} />
       </div>
 
       {error && <ErrorNotice message={error} retry={() => void load()} />}
@@ -204,7 +201,7 @@ export function EvaluationsView() {
 
         <div className="toolbar setup-toolbar">
           <div className="input-wrap setup-search"><Search size={14} /><input className="input" aria-label="Search evaluation scenarios" placeholder="Search scenarios, tools, or rules…" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
-          <select className="select setup-filter" aria-label="Filter by injection technique" value={category} onChange={(e) => setCategory(e.target.value)}><option value="all">All techniques</option>{categories.map((item) => <option value={item} key={item}>{humanize(item)}</option>)}</select>
+          <Select className="setup-filter" label="Filter by injection technique" value={category} onChange={setCategory} options={[{ value: 'all', label: 'All techniques' }, ...categories.map((item) => ({ value: item, label: humanize(item) }))]} />
         </div>
 
         <Card title="Scenario results" description={`${filtered.length} of ${report.scenarios.length} scenarios`} bodyClass="" footer={<span>Inspect a fixture or rerun its deterministic checks. Live activity is separate.</span>}>

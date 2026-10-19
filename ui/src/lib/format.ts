@@ -122,10 +122,10 @@ export function decisionMeta(d: string): { label: string; tone: Tone } {
 }
 
 export const EDGE_META: Record<GraphEdge['status'], { label: string; tone: Tone; color: string }> = {
-  BLOCKED: { label: 'Blocked', tone: 'red', color: '#f2555a' },
-  STEP_UP_PENDING: { label: 'Held', tone: 'amber', color: '#f1a93b' },
-  TAINTED: { label: 'Tainted', tone: 'blue', color: '#6aa6f8' },
-  ALLOWED: { label: 'Allowed', tone: 'neutral', color: '#52525b' },
+  BLOCKED: { label: 'Blocked', tone: 'red', color: 'var(--red)' },
+  STEP_UP_PENDING: { label: 'Held', tone: 'amber', color: 'var(--amber)' },
+  TAINTED: { label: 'Tainted', tone: 'blue', color: 'var(--info)' },
+  ALLOWED: { label: 'Allowed', tone: 'neutral', color: 'var(--text-4)' },
 };
 
 export const PIN_META: Record<SchemaPinRecord['status'], { label: string; tone: Tone }> = {
@@ -156,11 +156,11 @@ export function riskTone(score: number): Tone {
 }
 
 export const TONE_COLOR: Record<Tone, string> = {
-  red: '#f2555a',
-  amber: '#f1a93b',
-  green: '#4cc38a',
-  blue: '#6aa6f8',
-  neutral: '#71717a',
+  red: 'var(--red)',
+  amber: 'var(--amber)',
+  green: 'var(--ok)',
+  blue: 'var(--info)',
+  neutral: 'var(--text-3)',
 };
 
 /* ---------- JSON ---------- */

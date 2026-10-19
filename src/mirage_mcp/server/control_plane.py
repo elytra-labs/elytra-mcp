@@ -11,6 +11,7 @@ from pathlib import Path
 import queue
 import shlex
 import socket
+import sys
 import threading
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
@@ -59,7 +60,8 @@ class ControlPlaneServer:
     def __init__(self, host: str = "127.0.0.1", port: int = 8765,
                  db_path: str | Path | None = None, ui_dist_dir: str | Path | None = None,
                  token_file: str | Path = DEFAULT_TOKEN_FILE, auth_token: str | None = None,
-                 development_origin: str | None = None, cloud_credentials: dict | None = None) -> None:
+                 development_origin: str | None = None, cloud_credentials: dict | None = None,
+                 link_credentials: dict | None = None, link_credential_file: str | Path | None = None) -> None:
         if host not in ("127.0.0.1", "localhost", "::1"):
             raise ValueError("The local gateway must bind to loopback; remote hosting is unsupported")
         from mirage_mcp.runtime import RuntimeService
@@ -69,6 +71,8 @@ class ControlPlaneServer:
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.broker = _SSEBroker()
         self.cloud_connector = None
+        self.link_connector = None
+        self.link_credential_file = link_credential_file
         from mirage_mcp.server.notify import DesktopNotifier
         self.notifier = DesktopNotifier()
         if cloud_credentials:
@@ -83,6 +87,13 @@ class ControlPlaneServer:
                 raise
         else:
             self.runtime = RuntimeService(path, event_callback=self._runtime_event)
+            if link_credentials:
+                from mirage_mcp.cloud.linked import LinkedConnector
+                try:
+                    self.link_connector = LinkedConnector(self.runtime, link_credentials)
+                except Exception as exc:
+                    # An account link is optional; local protection starts without it.
+                    print(f"Account link not started: {exc}", file=sys.stderr)
         self.store = self.runtime
         self.ui_dist_dir = Path(ui_dist_dir) if ui_dist_dir else get_ui_dist_path()
         if development_origin:
@@ -104,7 +115,24 @@ class ControlPlaneServer:
     def _runtime_event(self, event: dict[str, Any]) -> None:
         self.broker.publish("interception_event", {"event": event})
         if self.cloud_connector: self.cloud_connector.notify(event)
+        if self.link_connector and event.get('decision') == 'STEP_UP_REQUIRED': self.link_connector.notify(event)
         self.notifier.notify_event(event)
+
+    def reload_link(self) -> dict:
+        """Start (or restart) the account link from its saved credential, without restarting the runtime."""
+        if self.cloud_connector:
+            return {'linked': False, 'error': 'Managed mode does not use a personal link'}
+        from mirage_mcp.cloud.client import DEFAULT_LINK_FILE, load_credentials
+        from mirage_mcp.cloud.linked import LinkedConnector
+        credentials = load_credentials(self.link_credential_file or DEFAULT_LINK_FILE)
+        if self.link_connector:
+            self.link_connector.stop()
+            self.link_connector = None
+        if not credentials:
+            return {'linked': False}
+        self.link_connector = LinkedConnector(self.runtime, credentials)
+        self.link_connector.start()
+        return self.link_connector.status()
 
     def pairing_url(self) -> str:
         return f"{self.base_url}/app/#pair/{self.access.create_pairing()}"
@@ -339,6 +367,7 @@ class ControlPlaneServer:
                     elif path == "/api/v1/redteam/scenarios": self._json(service.build_redteam_report())
                     elif path == "/api/v1/hosts": self._json({"hosts": runtime.list_hosts()})
                     elif path == "/api/v1/guardrails": self._json(runtime.guardrails())
+                    elif path == "/api/v1/cloud/link": self._json(service.link_connector.status() if service.link_connector else {'linked': False})
                     elif path == "/api/v1/catalog": self._json(runtime.catalog_servers())
                     elif path == "/api/v1/stream": self._stream(query)
                     else: self._json({"error": "Unknown endpoint"}, 404)
@@ -387,6 +416,13 @@ class ControlPlaneServer:
                             service.cloud_connector.stop()
                             self._json(result)
                         else: self._json({'managed': False, 'connected': False})
+                    elif path == '/api/v1/cloud/link/reload':
+                        self._json(service.reload_link())
+                    elif path == '/api/v1/cloud/link/disconnect':
+                        if service.link_connector:
+                            service.link_connector.stop()
+                            service.link_connector = None
+                        self._json({'linked': False})
                     elif path == "/api/v1/pair": self._json({"pairing_url": service.pairing_url()})
                     elif path in ("/api/v1/runs", "/api/v1/runtime/runs"):
                         self._json(runtime.create_run(intent=body.get("intent", ""), grants=body.get("grants", []), ttl_seconds=body.get("ttl_seconds", 3600)), 201)
@@ -558,6 +594,7 @@ class ControlPlaneServer:
         self._thread = threading.Thread(target=self._httpd.serve_forever, daemon=True, name="elytra-runtime")
         self._thread.start()
         if self.cloud_connector: self.cloud_connector.start()
+        if self.link_connector: self.link_connector.start()
         return self.base_url
 
     def wait_forever(self) -> None:
@@ -576,6 +613,7 @@ class ControlPlaneServer:
             self._httpd.server_close()
         if self._thread is not None: self._thread.join(timeout=2)
         if self.cloud_connector: self.cloud_connector.stop()
+        if self.link_connector: self.link_connector.stop()
         self.runtime.close()
 
     stop = shutdown

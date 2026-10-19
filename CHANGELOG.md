@@ -2,6 +2,8 @@
 
 ## 0.4.0a2 · Unreleased
 
+- Approve from your phone. `elytra link` links this machine to a free account (GitHub or Google sign-in); held actions then appear in the hosted dashboard, ready to approve or deny from any device. The local runtime, its database, guardrails and hooks stay authoritative: the link uploads redacted summaries of pending approvals only, never tool results or credentials, and applies a decision only when its Ed25519 signature, device, account, expiry and exact binding (run, call, tool, arguments digest, schema and policy version) all match a still-pending action. The first decision wins, a lost link never allows anything, and an unusable link never stops local protection from starting. `elytra unlink` stops it; `elytra status` and the console's Guardrails page show it. Team-managed mode (`elytra login`) is unchanged.
+- New interface palette. The green tint is gone: neutrals are neutral, allowed actions are quiet, and color marks only what needs a person (amber for held, red for blocked). Every text color passes measured contrast targets, decorative greys are no longer used for content, corner radii follow one scale, and all native dropdowns are replaced with a themed, keyboard-accessible control.
 - Open source at https://github.com/elytra-labs/elytra-mcp. The local runtime, hooks, CLI, console and site are licensed Apache-2.0 from this release (0.4.0a1 was MIT). The Elytra name and logo are covered by TRADEMARKS.md. The hosted service is not part of the open-source repository.
 
 ## 0.4.0a1 · 2026-10-18

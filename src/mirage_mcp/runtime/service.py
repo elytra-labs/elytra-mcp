@@ -742,6 +742,49 @@ class RuntimeService:
                         self._put("approvals", approval["approval_id"], approval)
         return [self._approval_view(a) for a in sorted(self._all("approvals"), key=lambda a: a["created_at_epoch"], reverse=True) if status is None or a["status"] == status]
 
+    LINK_BINDING = ("run_id", "call_id", "server_id", "tool_name", "arguments_hash", "schema_hash", "policy_version")
+
+    @_atomic
+    def link_snapshot(self) -> list[dict]:
+        """Pending approvals as redacted summaries for a linked account: never results, tokens or full arguments."""
+        summaries = []
+        for approval in self.list_approvals("PENDING"):
+            if approval.get("arguments_preview_truncated"):
+                continue  # Too large to review safely away from the machine; decide it locally.
+            run = self._get("runs", approval["run_id"]) or {}
+            summaries.append({
+                "local_approval_id": approval["approval_id"],
+                "binding": {**{key: approval[key] for key in self.LINK_BINDING}, "expires_at_epoch": approval["expires_at_epoch"]},
+                "summary": {"agent": str(run.get("host_label") or "Python integration")[:80], "reason": str(approval.get("reason", ""))[:500],
+                            "arguments_preview": approval["arguments_preview"], "created_at": approval["created_at"], "risk_score": approval.get("risk_score")},
+            })
+        return summaries[:30]
+
+    @_atomic
+    def apply_remote_decision(self, payload: dict) -> dict:
+        """Apply a verified decision from a linked account. The approval must still be pending with the exact binding.
+
+        The first decision wins: a local approval or denial made earlier leaves this one with nothing to resolve.
+        """
+        decision = payload.get("decision")
+        if decision not in {"APPROVED", "DENIED"}:
+            raise RuntimeValidationError("Remote decision must be APPROVED or DENIED")
+        command_key = "link-command:" + _identifier(payload.get("command_id"), "command_id")
+        if self._get("meta", command_key):
+            return {"status": "ALREADY_APPLIED"}
+        approval = self._get("approvals", _identifier(payload.get("approval_id"), "approval_id"))
+        if not approval or approval["status"] != "PENDING":
+            raise RuntimeConflictError("Approval is no longer pending")
+        if any(payload.get(key) != approval.get(key) for key in self.LINK_BINDING):
+            raise RuntimeConflictError("Remote decision does not match the held action")
+        result = self.resolve_approval(approval["approval_id"], decision, actor="linked account")
+        now = time.time()
+        self._put("meta", command_key, {"created_at_epoch": now})
+        for row in self._conn.execute("SELECT id,data FROM rt_meta WHERE id LIKE 'link-command:%'").fetchall():
+            if json.loads(row[1]).get("created_at_epoch", 0) < now - 86400:
+                self._conn.execute("DELETE FROM rt_meta WHERE id=?", (row[0],))
+        return result
+
     def _bump_version(self, reason: str):
         self._put("meta", "policy_version", {"version": self._version() + 1})
         for call in self._all("calls"):

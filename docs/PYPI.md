@@ -2,7 +2,7 @@
 
 Local guardrails for coding agents. Elytra checks what Claude Code, Codex, Grok and Antigravity do (shell commands, file edits, web access and MCP tool calls) and holds consequential actions for your decision before they run.
 
-Elytra is early access software. Everything runs on your machine: the runtime, the console and the decision records. There is no account to create.
+Elytra is early access software. Everything runs on your machine: the runtime, the console and the decision records. An account is optional.
 
 Website and documentation: https://elytra-labs.vercel.app
 
@@ -39,6 +39,17 @@ elytra uninstall   # restore every agent configuration exactly
 Agent actions are classified as reads, untrusted web reads, edits, unrecognized commands (treated as writes), sends (push, post, publish, upload), and deletes or history rewrites.
 
 When an action needs you, Claude Code and Grok show their own prompt with Elytra's reason. Codex, Antigravity, and any agent running with permissions bypassed wait up to ten minutes while Elytra sends a desktop notification; an action nobody approves is denied.
+
+## Approve from your phone
+
+Codex, Antigravity and agents running with permissions bypassed wait up to ten minutes when Elytra holds an action. To decide from another device, link a free account (GitHub or Google sign-in):
+
+```sh
+pipx install 'elytra-mcp[cloud]'   # the link needs the cloud extra
+elytra link
+```
+
+Held actions then appear in your dashboard at https://elytra-labs.vercel.app/app/. Your guardrails, history and decisions stay on your machine; only redacted summaries of held actions are sent, never tool results or credentials. A decision is signed, bound to that exact action and checked by your machine before anything runs. If the link is down, the action keeps waiting for you. `elytra unlink` stops it.
 
 ## Limits
 

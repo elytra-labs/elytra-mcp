@@ -215,6 +215,9 @@ def cmd_setup(args: argparse.Namespace) -> int:
     if restart:
         _say(f"Restart {', '.join(restart)} to finish. Your agents work as before; Elytra asks you when an action needs a decision.")
     _say("Open the console any time with `elytra open`. Undo everything with `elytra uninstall`.")
+    from mirage_mcp.cloud.client import DEFAULT_LINK_FILE
+    if not DEFAULT_LINK_FILE.exists():
+        _say("Away from your desk? `elytra link` lets you approve held actions from your phone with a free account. Optional.")
     if not args.yes and not args.no_open:
         _open_console(args.gateway)
     return 0
@@ -275,6 +278,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         for host in client.hosts()["hosts"]:
             if not host.get("revoked_at"):
                 _say(f"Host {host['label']}: {host['active_sessions']} active session(s)")
+    from mirage_mcp.cloud.client import DEFAULT_LINK_FILE
+    _say("Account link: on (approve from your phone)" if DEFAULT_LINK_FILE.exists() else "Account link: off (`elytra link` to approve from your phone)")
     return 0
 
 

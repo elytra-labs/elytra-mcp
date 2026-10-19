@@ -16,13 +16,13 @@ export function FlowSchematic({ className = "field-fallback" }: { className?: st
       <g fill="none" strokeWidth="1">
         {lines.map((y) => {
           const near = Math.max(0, 1 - Math.abs(y - 400) / 230);
-          return <path key={y} d={`M-20 ${y} C 500 ${y}, 640 ${y - near * 26}, 840 ${y - near * 18} S 1100 ${y + near * 22}, 1240 ${y + near * 30}`} stroke={near > 0 ? "#9bb380" : "#c9cfc2"} strokeOpacity={0.12 + near * 0.18} />;
+          return <path key={y} d={`M-20 ${y} C 500 ${y}, 640 ${y - near * 26}, 840 ${y - near * 18} S 1100 ${y + near * 22}, 1240 ${y + near * 30}`} stroke={near > 0 ? "#e6e6e6" : "#b4b4b4"} strokeOpacity={0.12 + near * 0.18} />;
         })}
-        <path d="M-20 430 C 500 430, 720 426, 905 418" stroke="#e2a84b" strokeOpacity=".8" strokeWidth="1.4" />
+        <path d="M-20 430 C 500 430, 720 426, 905 418" stroke="#f0b04f" strokeOpacity=".8" strokeWidth="1.4" />
       </g>
-      <path d="M640 400 L960 250 L960 318 L842 400 L960 482 L960 550 Z" fill="#14171a" stroke="#e6eadf" strokeOpacity=".55" />
-      <path d="M905 405 L960 400 L960 438 L905 430 Z" fill="#1d1b16" stroke="#e2a84b" strokeOpacity=".85" />
-      <circle cx="905" cy="418" r="5" fill="#e2a84b" />
+      <path d="M640 400 L960 250 L960 318 L842 400 L960 482 L960 550 Z" fill="#141414" stroke="#e8e8e8" strokeOpacity=".55" />
+      <path d="M905 405 L960 400 L960 438 L905 430 Z" fill="#1d1b16" stroke="#f0b04f" strokeOpacity=".85" />
+      <circle cx="905" cy="418" r="5" fill="#f0b04f" />
     </svg>
   );
 }

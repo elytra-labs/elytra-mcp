@@ -10,8 +10,10 @@
 .guard-apply p { margin: 0; font-size: 12.5px; }
 .guard-servers { display: flex; flex-direction: column; gap: 12px; }
 .guard-server { display: flex; gap: 10px; align-items: flex-start; }
-.guard-server svg { color: var(--green); margin-top: 2px; flex-shrink: 0; }
+.guard-server svg { color: var(--ok); margin-top: 2px; flex-shrink: 0; }
 .guard-server p { margin: 4px 0 0; font-size: 12px; }
 @media (max-width: 860px) { .guard-presets { grid-template-columns: 1fr; } }
 .guard-unclassified { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid var(--amber-border); border-radius: var(--radius-lg); background: var(--amber-soft); font-size: 12.5px; color: var(--text-2); flex-wrap: wrap; }
 .guard-unclassified strong { color: var(--text); font-weight: 500; }
+.guard-link { display: grid; gap: 10px; justify-items: start; }
+.guard-link .code { justify-self: stretch; }

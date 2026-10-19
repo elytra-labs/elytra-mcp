@@ -118,13 +118,22 @@ def cmd_up(args: argparse.Namespace) -> int:
     from mirage_mcp.server.control_plane import ControlPlaneServer
     from mirage_mcp.cloud.client import load_credentials
     credentials = load_credentials(args.cloud_credential_file)
+    link = None
+    if not credentials:
+        try:
+            link = load_credentials(args.link_credential_file)
+        except Exception as exc:
+            print(f"Account link not started: {exc}", file=sys.stderr)
     server = ControlPlaneServer(host=args.host, port=args.port, db_path=args.db,
                                 token_file=args.token_file, development_origin=args.dev_origin,
-                                cloud_credentials=credentials)
+                                cloud_credentials=credentials, link_credentials=link,
+                                link_credential_file=args.link_credential_file)
     server.start_background()
     print(f"Elytra website: {server.base_url}")
     print(f"Local console: {server.base_url}/app/ (pair with elytra connect --open)")
     print("Coverage: explicitly identified runs through the Python integration or scoped tools-only stdio bridge.")
+    if server.link_connector:
+        print(f"Linked: held actions also appear at {server.link_connector.origin}/app/ for you to approve.")
     if args.open:
         webbrowser.open(server.pairing_url())
     try:
@@ -301,6 +310,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_up.add_argument("--token-file", default=str(Path.home() / ".elytra/control-plane.token"))
     p_up.add_argument("--dev-origin", default=None, help="Explicit local frontend development origin")
     p_up.add_argument('--cloud-credential-file', default=str(Path.home() / '.elytra/cloud-device.json'))
+    p_up.add_argument('--link-credential-file', default=str(Path.home() / '.elytra/cloud-link.json'))
     p_up.set_defaults(func=cmd_up)
     p_connect = sub.add_parser("connect", help="Pair a local browser with a one-time link")
     p_connect.add_argument("--gateway", default="http://127.0.0.1:8765")
@@ -363,6 +373,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_login.add_argument('--code', action='store_true', help='Print a one-time code for manual enrollment instead of opening a browser')
     p_login.add_argument('--credential-file', default=str(DEFAULT_CREDENTIAL_FILE))
     p_login.set_defaults(func=cloud_cli.login)
+    from mirage_mcp.cloud.client import DEFAULT_CLOUD_URL, DEFAULT_LINK_FILE
+    p_link = sub.add_parser('link', help='Approve held actions from your phone: link this machine to a free account')
+    p_link.add_argument('--cloud-url', default=DEFAULT_CLOUD_URL, help='Elytra HTTPS origin (default: %(default)s)')
+    p_link.add_argument('--device-name')
+    p_link.add_argument('--code', action='store_true', help='Print a one-time code instead of opening a browser')
+    p_link.add_argument('--credential-file', default=str(DEFAULT_LINK_FILE))
+    p_link.add_argument('--managed-credential-file', default=str(DEFAULT_CREDENTIAL_FILE))
+    p_link.add_argument('--gateway', default='http://127.0.0.1:8765')
+    p_link.add_argument('--token-file', default=str(Path.home()/'.elytra/control-plane.token'))
+    p_link.set_defaults(func=cloud_cli.link)
+    p_unlink = sub.add_parser('unlink', help='Stop approving held actions from your account')
+    p_unlink.add_argument('--credential-file', default=str(DEFAULT_LINK_FILE))
+    p_unlink.add_argument('--gateway', default='http://127.0.0.1:8765')
+    p_unlink.add_argument('--token-file', default=str(Path.home()/'.elytra/control-plane.token'))
+    p_unlink.set_defaults(func=cloud_cli.unlink)
     p_logout = sub.add_parser('logout', help='Remove this machine cloud enrollment')
     p_logout.add_argument('--credential-file', default=str(DEFAULT_CREDENTIAL_FILE))
     p_logout.add_argument('--gateway', default='http://127.0.0.1:8765')

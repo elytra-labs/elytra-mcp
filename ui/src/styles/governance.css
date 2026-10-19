@@ -25,7 +25,7 @@
 .governance-policy-controls { flex-shrink: 0; font-size: 12px; }
 .governance-policy-description { margin: 9px 0 16px; max-width: 720px; color: var(--text-2); font-size: 12px; line-height: 1.7; }
 .governance-patterns { gap: 10px; flex-wrap: wrap; }
-.governance-patterns > .mono { color: var(--text-2); padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; overflow-wrap: anywhere; }
+.governance-patterns > .mono { color: var(--text-2); padding: 2px 6px; border: 1px solid var(--border); border-radius: var(--radius-xs); font-size: 11px; overflow-wrap: anywhere; }
 .governance-policy-threshold { font-size: 11px; color: var(--text-3); margin-left: 4px; }
 .governance-policy-id { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--text-3); font-size: 11px; margin-top: 12px; }
 .governance-policy-id .mono { font-size: 10px; }

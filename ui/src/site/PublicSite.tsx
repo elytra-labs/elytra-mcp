@@ -16,6 +16,7 @@ import "./styles/home.css";
 import HeroVisual from "./HeroVisual";
 import { BoundarySection } from "./BoundarySection";
 import { scrollToElement, SmoothScroll } from "./motion/SmoothScroll";
+import { startPageAnalytics, trackSiteClicks } from "./metrics";
 
 const CLOUD = import.meta.env.VITE_DEPLOY_TARGET === 'cloud';
 
@@ -42,9 +43,8 @@ const SOURCE_INSTALL = `git clone https://github.com/elytra-labs/elytra-mcp.git
 cd elytra-mcp
 (cd ui && npm ci && npm run build)
 python3 -m pip install .`;
-const hostedInstall = (origin: string) => `pipx install 'elytra-mcp[cloud]'
-elytra login --cloud-url ${origin}
-elytra up`;
+const HOSTED_INSTALL = `pipx install 'elytra-mcp[cloud]'
+elytra setup`;
 const STEPS = [
   {
     label: "Read external context",
@@ -579,6 +579,7 @@ function Docs() {
       <aside className="docs-nav">
         <span className="site-eyebrow">DOCUMENTATION</span>
         <a href="#installation">Installation</a>
+        {hosted && <a href="#phone">Approve from your phone</a>}
         <a href="#connect-agent">Protect your agent</a>
         <a href="#first-run">First run</a>
         <a href="#integration">Python integration</a>
@@ -595,19 +596,17 @@ function Docs() {
           An explicit boundary.
         </h1>
         <p className="doc-lead">
-          Elytra is an early access local runtime and console for inspecting MCP
-          actions. Start with a Python agent that can provide a reliable run
-          identity.
+          Elytra is an early access local runtime that checks what your coding
+          agents do and holds consequential actions for your decision. Install it,
+          run setup, and keep working as usual.
         </p>
-        {hosted && <section id="hosted-workspace">
-          <h2>Connect your hosted workspace</h2>
-          <p><a href="/signup">Sign in with GitHub or Google</a>, create a workspace, then install the runtime on the machine where your MCP tools execute. Identity sign-in does not grant repository access.</p>
-          <Code>{`elytra up
-# In another terminal:
-elytra login --cloud-url ${window.location.origin}`}</Code>
-          <p>The cloud connector requires version 0.4.0a1 or newer. Stop any running standalone server first. The CLI opens a one-time browser confirmation. Check the device name, verification code, and selected workspace. The runtime connects outbound over HTTPS; keep local ports private. Start or restart elytra up after login to use its separate managed database.</p>
-          <p>Review the synchronized tool metadata in <a href="/app/">your dashboard</a>. Use the protected Python integration below with an explicit run identity. Verify a harmless read, then confirm a held fixture cannot mutate its destination.</p>
-          <div className="doc-note">Free beta limits: one owned workspace, three members, two devices, and 500 uploaded events per workspace daily. Cloud capacity is shared and finite. Activity is retained for 24 hours; bounded approvals and audit records for seven days. There are no automatic paid upgrades.</div>
+        {hosted && <section id="phone">
+          <h2>Approve from your phone</h2>
+          <p>Codex, Antigravity and agents running with permissions bypassed wait up to ten minutes when Elytra holds an action. Link a free account and decide those actions from any device, signed in with GitHub or Google.</p>
+          <Code>{`elytra link`}</Code>
+          <p>The terminal opens a confirmation page and prints a fingerprint; approve only if it matches. Held actions then appear in <a href="/app/">your dashboard</a> with the agent, the tool, Elytra's reason and a redacted preview of the arguments.</p>
+          <p>Your guardrails, history and decisions stay on your machine. Only summaries of held actions are sent, never tool results or credentials. A decision applies to that exact action, and your machine checks it before anything runs; if the link is down, the action simply keeps waiting for you. Run <span className="mono">elytra unlink</span> to stop.</p>
+          <div className="doc-note">Teams that manage policy and tool review centrally can enroll a runtime with elytra login --cloud-url {window.location.origin} instead. Free beta limits: one owned workspace, three members and two devices.</div>
         </section>}
         <section id="installation">
           <h2>Install</h2>
@@ -616,7 +615,7 @@ elytra login --cloud-url ${window.location.origin}`}</Code>
             <a href="https://pypi.org/project/elytra-mcp/">elytra-mcp</a>; pipx keeps it in its own
             environment. Setup is guided and asks before it changes anything.
           </p>
-          <Code>{hosted ? hostedInstall(window.location.origin) : INSTALL}</Code>
+          <Code>{hosted ? HOSTED_INSTALL : INSTALL}</Code>
           <p>
             Setup runs the runtime in the background and opens the local console with a
             one-time pairing link. To pair later, run elytra connect --open. For
@@ -1011,7 +1010,7 @@ function Download() {
       </p>
       <section>
         <h2>Install</h2>
-        <Code>{hosted ? hostedInstall(window.location.origin) : INSTALL}</Code>
+        <Code>{hosted ? HOSTED_INSTALL : INSTALL}</Code>
         <p>
           Python 3.11 or newer is required. The package includes the local console;
           building from source needs Node.js 22.12+ for the console.
@@ -1065,6 +1064,10 @@ export function PublicSite() {
   useEffect(() => {
     document.title = `${title} · Elytra`;
   }, [title]);
+  useEffect(() => {
+    startPageAnalytics();
+    return trackSiteClicks(document);
+  }, []);
   const page =
     path === "/docs" ? (
       <Docs />

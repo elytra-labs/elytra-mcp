@@ -13,6 +13,9 @@ from urllib.parse import urlsplit
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
 
 DEFAULT_CREDENTIAL_FILE = Path.home() / '.elytra' / 'cloud-device.json'
+# A personal link keeps this machine's runtime and database authoritative; see linked.py.
+DEFAULT_LINK_FILE = Path.home() / '.elytra' / 'cloud-link.json'
+DEFAULT_CLOUD_URL = 'https://elytra-labs.vercel.app'
 
 class CloudError(RuntimeError):
     pass

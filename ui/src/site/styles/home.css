@@ -19,8 +19,8 @@
   z-index: 1;
   pointer-events: none;
   background:
-    linear-gradient(90deg, var(--stage) 0%, rgba(7, 8, 10, 0.86) 26%, rgba(7, 8, 10, 0.25) 46%, rgba(7, 8, 10, 0) 58%),
-    linear-gradient(180deg, rgba(7, 8, 10, 0.92) 0%, rgba(7, 8, 10, 0) 24%, rgba(7, 8, 10, 0) 70%, var(--stage) 100%);
+    linear-gradient(90deg, var(--stage) 0%, color-mix(in oklab, var(--stage) 86%, transparent) 26%, color-mix(in oklab, var(--stage) 25%, transparent) 46%, color-mix(in oklab, var(--stage) 0%, transparent) 58%),
+    linear-gradient(180deg, color-mix(in oklab, var(--stage) 92%, transparent) 0%, color-mix(in oklab, var(--stage) 0%, transparent) 24%, color-mix(in oklab, var(--stage) 0%, transparent) 70%, var(--stage) 100%);
 }
 .elytra-hero > :not(.field-layer) {
   position: relative;
@@ -48,8 +48,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--sage);
-  box-shadow: 0 0 10px var(--sage);
+  background: var(--signal);
+  box-shadow: 0 0 10px var(--signal);
 }
 .hero-composition {
   flex: 1;
@@ -65,7 +65,7 @@
   margin-bottom: 28px;
   font: 500 11px/1.4 var(--font-mono);
   letter-spacing: 0.14em;
-  color: var(--sage);
+  color: var(--signal);
 }
 .elytra-hero h1 {
   font-family: var(--font-display);
@@ -114,8 +114,8 @@
   gap: 10px;
   padding: 9px 14px;
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: rgba(13, 15, 13, 0.7);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--raised) 70%, transparent);
   color: var(--ink-2);
   font: 500 12.5px/1 var(--font-mono);
   transition: border-color 160ms ease, color 160ms ease;
@@ -124,7 +124,7 @@
   color: var(--ink-4);
 }
 .hero-install:hover {
-  border-color: rgba(232, 235, 224, 0.3);
+  border-color: color-mix(in oklab, var(--ink) 30%, transparent);
   color: var(--ink);
 }
 .hero-platforms {
@@ -139,7 +139,7 @@
 .hero-platforms span:first-child {
   font: 500 10px/1 var(--font-mono);
   letter-spacing: 0.14em;
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 .hero-platforms i {
   width: 3px;
@@ -196,9 +196,9 @@
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border: 1px solid rgba(226, 168, 75, 0.28);
-  border-radius: 999px;
-  background: rgba(7, 8, 10, 0.72);
+  border: 1px solid color-mix(in oklab, var(--amber) 28%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--stage) 72%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--amber);
@@ -229,8 +229,8 @@
   gap: 7px;
   padding: 6px 11px;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(7, 8, 10, 0.6);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--stage) 60%, transparent);
   color: var(--ink-3);
   font: 500 11px/1 var(--font-mono);
   cursor: pointer;
@@ -351,7 +351,7 @@
   color: var(--ink-3);
 }
 .stack-steps li.active .stack-index {
-  color: var(--sage);
+  color: var(--signal);
 }
 .stack-steps h3 {
   font-size: 16px;
@@ -368,7 +368,7 @@
   color: var(--amber);
 }
 .stack-steps li:nth-child(2) code {
-  color: var(--sage);
+  color: var(--signal);
 }
 .stack-steps p {
   max-height: 0;
@@ -401,8 +401,8 @@
 .console-shot {
   overflow: hidden;
   border: 1px solid var(--line-strong);
-  border-radius: 14px;
-  background: #0b0c0d;
+  border-radius: var(--radius-lg);
+  background: var(--raised);
   box-shadow: 0 50px 120px -40px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(0, 0, 0, 0.5);
   color: var(--ink);
   font-size: 13px;
@@ -431,7 +431,7 @@
 .shot-tag {
   margin-left: auto;
   letter-spacing: 0.12em;
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 .shot-body {
   display: grid;
@@ -460,17 +460,17 @@
   align-items: center;
   gap: 9px;
   padding: 7px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition: background 300ms ease, color 300ms ease;
 }
 .shot-nav > span.on {
-  background: rgba(232, 235, 224, 0.06);
+  background: color-mix(in oklab, var(--ink) 6%, transparent);
   color: var(--ink);
 }
 .shot-nav b {
   margin-left: auto;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--amber-soft);
   color: var(--amber);
   font: 600 10px/1.5 var(--font-mono);
@@ -573,8 +573,8 @@
   margin: 0;
   padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(232, 235, 224, 0.03);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--ink) 3%, transparent);
   color: var(--ink-2);
   font: 400 12px/1.6 var(--font-mono);
   overflow: hidden;
@@ -596,12 +596,12 @@
 .stack-meter i {
   width: 22px;
   height: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--line-strong);
   transition: background 300ms ease;
 }
 .stack-meter i.on {
-  background: var(--sage);
+  background: var(--signal);
 }
 
 /* Principles ------------------------------------------------------- */
@@ -629,7 +629,7 @@
   color: var(--ink-4);
 }
 .principles-grid svg {
-  color: var(--sage);
+  color: var(--signal);
   stroke-width: 1.4;
   margin: 14px 0 6px;
 }
@@ -674,9 +674,9 @@
 .local-diagram {
   padding: 28px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background:
-    radial-gradient(ellipse 80% 60% at 50% 50%, rgba(155, 179, 128, 0.07), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 50%, color-mix(in oklab, var(--signal) 7%, transparent), transparent 70%),
     var(--raised);
   display: flex;
   flex-direction: column;
@@ -693,7 +693,7 @@
 .local-tools {
   padding: 16px 18px;
   border: 1px solid var(--line-strong);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--raised-2);
 }
 .local-agent {
@@ -713,8 +713,8 @@
   grid-template-rows: auto auto;
   column-gap: 14px;
   align-items: center;
-  border-color: rgba(155, 179, 128, 0.4);
-  box-shadow: 0 0 0 4px var(--sage-soft), 0 0 50px -10px rgba(155, 179, 128, 0.35);
+  border-color: color-mix(in oklab, var(--signal) 40%, transparent);
+  box-shadow: 0 0 0 4px var(--signal-soft), 0 0 50px -10px color-mix(in oklab, var(--signal) 35%, transparent);
 }
 .local-runtime svg {
   grid-row: span 2;
@@ -732,7 +732,7 @@
   width: 1px;
   height: 30px;
   margin: 0 auto;
-  background: linear-gradient(var(--line-strong), var(--sage));
+  background: linear-gradient(var(--line-strong), var(--signal));
 }
 .local-tools {
   display: flex;
@@ -742,7 +742,7 @@
 .local-tools span {
   padding: 5px 10px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--ink-2);
   font: 500 11px/1.4 var(--font-mono);
 }
@@ -775,7 +775,7 @@
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: radial-gradient(ellipse 46% 40% at 50% 50%, rgba(7, 8, 10, 0.88), rgba(7, 8, 10, 0) 100%);
+  background: radial-gradient(ellipse 46% 40% at 50% 50%, color-mix(in oklab, var(--stage) 88%, transparent), color-mix(in oklab, var(--stage) 0%, transparent) 100%);
 }
 .site-final h2 {
   margin: 28px 0 44px;
@@ -787,7 +787,7 @@
 }
 .site-final h2 em {
   font-style: normal;
-  color: var(--sage);
+  color: var(--signal);
 }
 .site-final .site-actions {
   justify-content: center;
@@ -811,7 +811,7 @@
 }
 @media (max-width: 860px) {
   .elytra-hero::before {
-    background: linear-gradient(180deg, rgba(7, 8, 10, 0.72) 0%, rgba(7, 8, 10, 0.88) 45%, rgba(7, 8, 10, 0.55) 70%, var(--stage) 100%);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--stage) 72%, transparent) 0%, color-mix(in oklab, var(--stage) 88%, transparent) 45%, color-mix(in oklab, var(--stage) 55%, transparent) 70%, var(--stage) 100%);
   }
   .field-caption,
   .motion-button {

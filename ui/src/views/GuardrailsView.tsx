@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, MonitorSmartphone, ShieldCheck } from 'lucide-react';
-import { api, type CatalogState, type GuardrailDecision, type GuardrailPreset, type GuardrailsState, type HostRecord } from '../lib/api';
+import { api, type CatalogState, type LinkStatus, type GuardrailDecision, type GuardrailPreset, type GuardrailsState, type HostRecord } from '../lib/api';
 import type { SchemaPinRecord } from '../types/controlPlane';
 import { useStore } from '../lib/store';
-import { Badge, Card, Empty, PageHeader, SkeletonRows } from '../components/ui';
+import { Badge, Card, Code, Empty, PageHeader, SkeletonRows } from '../components/ui';
 import { timeAgo } from '../lib/format';
 import '../styles/guardrails.css';
 
@@ -22,6 +22,7 @@ export function GuardrailsView() {
   const [hosts, setHosts] = useState<HostRecord[]>([]);
   const [catalog, setCatalog] = useState<CatalogState | null>(null);
   const [pins, setPins] = useState<SchemaPinRecord[]>([]);
+  const [link, setLink] = useState<LinkStatus | null>(null);
   const [selected, setSelected] = useState<GuardrailPreset['id'] | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -31,6 +32,7 @@ export function GuardrailsView() {
     try {
       const [g, h, c, p] = await Promise.all([api.guardrails(), api.hosts(), api.catalog(), api.schemaPins()]);
       setState(g); setHosts(h); setCatalog(c); setPins(p);
+      api.linkStatus().then(setLink).catch(() => setLink(null));
       setSelected((current) => current ?? g.preset ?? g.default);
       setError('');
     } catch (e) {
@@ -149,6 +151,23 @@ export function GuardrailsView() {
           </div>
         )}
       </Card>
+
+      {link && (
+        <Card title="Approve from your phone" description={link.linked ? `Held actions also appear at ${link.origin}/app/. A decision there applies only to the exact action, and this machine checks it before anything runs.` : 'Codex, Antigravity and agents running with permissions bypassed wait up to ten minutes for you. Link a free account to approve or deny them from any device.'}>
+          {link.linked ? (
+            <div className="guard-link">
+              {link.last_error ? <Badge tone="amber" dot>{link.last_error}</Badge> : link.connected ? <Badge tone="green" dot>Linked</Badge> : <Badge dot>Connecting</Badge>}
+              {link.last_sync ? <span className="subtle">Last checked {timeAgo(new Date(link.last_sync * 1000).toISOString())}</span> : null}
+              <span className="subtle">To stop, run <code className="mono">elytra unlink</code>.</span>
+            </div>
+          ) : (
+            <div className="guard-link">
+              <Code>{'elytra link'}</Code>
+              <p className="subtle">Run it in a terminal and sign in with GitHub or Google. Your guardrails, history and decisions stay on this machine; only summaries of held actions are sent.</p>
+            </div>
+          )}
+        </Card>
+      )}
 
       {recognized.length > 0 && catalog && (
         <Card title="Recognized servers" description="Listed tools from these servers were classified from Elytra's catalog when you accepted it. Unlisted or changed tools still wait for review." bodyClass="">

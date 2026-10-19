@@ -2,23 +2,24 @@
 
 /* ------------------------------------------------------------------
    Elytra public site: shared foundation.
-   One dark stage, two signal colors. Sage = allowed, amber = held.
+   One dark stage, one signal color: amber marks a held action. Everything else is neutral.
 ------------------------------------------------------------------- */
 
 .public-site {
-  --stage: #07080a;
-  --raised: #0d0f0d;
-  --raised-2: #131613;
-  --line: rgba(232, 235, 224, 0.08);
-  --line-strong: rgba(232, 235, 224, 0.15);
-  --ink: #f0efe9;
-  --ink-2: #a9b0a4;
-  --ink-3: #6b7266;
-  --ink-4: #474d44;
-  --sage: #9bb380;
-  --sage-soft: rgba(155, 179, 128, 0.12);
-  --amber: #e2a84b;
-  --amber-soft: rgba(226, 168, 75, 0.12);
+  --stage: #080808;
+  --raised: #0f0f0f;
+  --raised-2: #161616;
+  --line: color-mix(in oklab, var(--ink) 9%, transparent);
+  --line-strong: color-mix(in oklab, var(--ink) 16%, transparent);
+  --ink: #f3f3f3;
+  --ink-2: #bebebe;
+  --ink-3: #a0a0a0;
+  --ink-4: #808080; /* Decorative only. */
+  --signal: #d7d7d7; /* Allowed and interactive states stay neutral; amber alone marks a held action. */
+  --signal-soft: color-mix(in oklab, var(--signal) 12%, transparent);
+  --amber: #f0b04f;
+  --amber-soft: color-mix(in oklab, var(--amber) 12%, transparent);
+  --scrim: color-mix(in oklab, var(--stage) 72%, transparent);
   --max: 1280px;
   --gutter: clamp(20px, 4vw, 48px);
   --header: 72px;
@@ -56,12 +57,12 @@
 }
 .public-site a:focus-visible,
 .public-site button:focus-visible {
-  outline: 2px solid var(--sage);
+  outline: 2px solid var(--signal);
   outline-offset: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .public-site ::selection {
-  background: rgba(155, 179, 128, 0.32);
+  background: color-mix(in oklab, var(--signal) 32%, transparent);
 }
 .public-site main:focus {
   outline: none;
@@ -76,7 +77,7 @@
   left: 12px;
   z-index: 100;
   padding: 10px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--ink);
   color: var(--stage) !important;
   transform: translateY(-160%);
@@ -99,7 +100,7 @@
   transition: background 240ms ease, border-color 240ms ease, backdrop-filter 240ms ease;
 }
 .site-header.scrolled {
-  background: rgba(7, 8, 10, 0.72);
+  background: color-mix(in oklab, var(--stage) 72%, transparent);
   border-bottom-color: var(--line);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
@@ -157,7 +158,7 @@
   justify-content: center;
   gap: 9px;
   border: 1px solid var(--line-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--ink);
   font: 500 14px/1 var(--font-sans);
@@ -166,8 +167,8 @@
   transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms var(--ease-out);
 }
 .site-button:hover {
-  border-color: rgba(232, 235, 224, 0.3);
-  background: rgba(232, 235, 224, 0.04);
+  border-color: color-mix(in oklab, var(--ink) 30%, transparent);
+  background: color-mix(in oklab, var(--ink) 4%, transparent);
 }
 .site-button:active {
   transform: scale(0.98);
@@ -175,11 +176,11 @@
 .site-button.primary {
   background: var(--ink);
   border-color: var(--ink);
-  color: #0b0d0b;
+  color: var(--stage);
 }
 .site-button.primary:hover {
-  background: #fff;
-  border-color: #fff;
+  background: #ffffff;
+  border-color: #ffffff;
 }
 .site-button.small {
   min-height: 36px;
@@ -197,7 +198,7 @@
   transition: border-color 160ms ease;
 }
 .site-text-link:hover {
-  border-color: var(--sage);
+  border-color: var(--signal);
 }
 .site-eyebrow,
 .section-label {
@@ -251,7 +252,7 @@
   border-top: 1px solid var(--line);
   font: 500 11px/1.5 var(--font-mono);
   letter-spacing: 0.06em;
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 
 /* Reading theme: docs, security, changelog, install ---------------- */
@@ -283,7 +284,7 @@
 }
 .docs-nav a:hover {
   color: var(--ink);
-  border-left-color: var(--sage);
+  border-left-color: var(--signal);
 }
 .doc-content {
   min-width: 0;
@@ -334,11 +335,11 @@
 .doc-content a:not(.site-button):not(.site-text-link) {
   color: var(--ink);
   text-decoration: underline;
-  text-decoration-color: rgba(155, 179, 128, 0.55);
+  text-decoration-color: color-mix(in oklab, var(--signal) 55%, transparent);
   text-underline-offset: 4px;
 }
 .doc-content a:not(.site-button):not(.site-text-link):hover {
-  text-decoration-color: var(--sage);
+  text-decoration-color: var(--signal);
 }
 .doc-content ol,
 .doc-content ul {
@@ -357,7 +358,7 @@
   margin: 22px 0;
   padding: 20px 22px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--raised);
   font-size: 12.5px;
   line-height: 1.85;
@@ -365,7 +366,7 @@
 .doc-content code:not(.code code) {
   padding: 2px 6px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: var(--raised-2);
   font-family: var(--font-mono);
   font-size: 0.86em;
@@ -384,9 +385,9 @@
   margin: 24px 0;
   padding: 16px 20px;
   border: 1px solid var(--line);
-  border-left: 2px solid var(--sage);
+  border-left: 2px solid var(--signal);
   border-radius: 0 8px 8px 0;
-  background: rgba(155, 179, 128, 0.04);
+  background: color-mix(in oklab, var(--signal) 4%, transparent);
   color: var(--ink-2);
   font-size: 14px;
   line-height: 1.7;
@@ -396,7 +397,7 @@
   margin-bottom: 10px;
   font: 500 11px/1.4 var(--font-mono);
   letter-spacing: 0.1em;
-  color: var(--sage);
+  color: var(--signal);
 }
 
 /* Walkthrough page ------------------------------------------------- */
@@ -434,7 +435,7 @@
 .walkthrough-tabs button {
   padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ink-3);
   font: 400 14px/1.4 var(--font-sans);
@@ -465,7 +466,7 @@
 .product-window {
   overflow: hidden;
   border: 1px solid var(--line-strong);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--raised);
   box-shadow: 0 40px 120px -40px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.4);
   color: var(--ink);
@@ -515,7 +516,7 @@
 }
 .mini-sidebar span {
   padding: 7px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 .mini-sidebar .mini-selected {
   background: var(--raised-2);
@@ -549,8 +550,8 @@
 }
 .run-badge {
   padding: 4px 10px;
-  border: 1px solid rgba(226, 168, 75, 0.3);
-  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--amber) 30%, transparent);
+  border-radius: var(--radius-pill);
   background: var(--amber-soft);
   color: var(--amber);
   font: 500 11px/1.4 var(--font-mono);
@@ -590,7 +591,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--line-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--raised-2);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
@@ -598,8 +599,8 @@
   color: var(--amber);
 }
 .flow-active .point-icon {
-  border-color: var(--sage);
-  box-shadow: 0 0 0 4px var(--sage-soft);
+  border-color: var(--signal);
+  box-shadow: 0 0 0 4px var(--signal-soft);
 }
 .flow-active .point-icon.held {
   border-color: var(--amber);
@@ -609,7 +610,7 @@
   flex: 1;
   height: 1px;
   margin-bottom: 34px;
-  background: linear-gradient(90deg, var(--line-strong), var(--sage));
+  background: linear-gradient(90deg, var(--line-strong), var(--signal));
 }
 .flow-line.held {
   background: repeating-linear-gradient(90deg, var(--amber) 0 5px, transparent 5px 10px);
@@ -621,7 +622,7 @@
   gap: 14px;
   padding: 14px 16px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--raised-2);
 }
 .illustration-event > div:not(.event-marker) {
@@ -660,16 +661,16 @@
 }
 /* The read step is observed, not held. */
 .run-badge.read {
-  border-color: rgba(155, 179, 128, 0.3);
-  background: var(--sage-soft);
-  color: var(--sage);
+  border-color: color-mix(in oklab, var(--signal) 30%, transparent);
+  background: var(--signal-soft);
+  color: var(--signal);
 }
 .illustration-event.read .event-marker {
-  background: var(--sage);
-  box-shadow: 0 0 12px var(--sage);
+  background: var(--signal);
+  box-shadow: 0 0 12px var(--signal);
 }
 .illustration-event.read .held-label {
-  color: var(--sage);
+  color: var(--signal);
 }
 .illustration-explanation {
   display: flex;
@@ -679,7 +680,7 @@
 .illustration-explanation svg {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--sage);
+  color: var(--signal);
 }
 .illustration-explanation strong {
   display: block;
@@ -749,7 +750,7 @@
     gap: 20px;
     padding: 24px var(--gutter) 28px;
     border-bottom: 1px solid var(--line);
-    background: rgba(7, 8, 10, 0.96);
+    background: color-mix(in oklab, var(--stage) 96%, transparent);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     font-size: 16px;

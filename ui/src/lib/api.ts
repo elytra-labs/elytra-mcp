@@ -64,6 +64,8 @@ export interface GuardrailPreset {
   summary: string;
   matrix: Record<'reads' | 'writes' | 'sends' | 'destructive', [GuardrailDecision, GuardrailDecision]>;
 }
+export type LinkStatus = { linked: boolean; origin?: string; connected?: boolean; last_sync?: number | null; last_error?: string | null; decisions_applied?: number };
+
 export interface GuardrailsState {
   preset: GuardrailPreset['id'] | null;
   applied_at: string | null;
@@ -101,6 +103,7 @@ export const api = {
     request<{ servers: DiscoveredServer[] }>('/discovery').then((r) => r.servers),
   evaluations: () => request<RedTeamBenchmarkReport>('/redteam/scenarios'),
   guardrails: () => request<GuardrailsState>('/guardrails'),
+  linkStatus: () => request<LinkStatus>('/cloud/link'),
   applyGuardrails: (preset: GuardrailPreset['id']) => post<GuardrailsState>('/guardrails', { preset }),
   hosts: () => request<{ hosts: HostRecord[] }>('/hosts').then((r) => r.hosts),
   revokeHost: (host_id: string) => post<HostRecord>(`/hosts/${encodeURIComponent(host_id)}/revoke`, {}),

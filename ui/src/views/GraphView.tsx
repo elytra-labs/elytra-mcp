@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownToLine, ArrowRight, Box, Check, ChevronRight, Crosshair, GitBranch, Layers, Minus, MousePointer2, Plus, Search, ShieldCheck, X } from 'lucide-react';
-import { Badge, Chain, Code, Empty } from '../components/ui';
+import { Badge, Chain, Code, Empty, Select } from '../components/ui';
 import { EDGE_META, fullDate, humanize, ms, shortHash, toolLabel } from '../lib/format';
 import { useStore } from '../lib/store';
 import type { GraphNode, NodeRole } from '../types/controlPlane';
@@ -114,13 +114,13 @@ export function GraphView() {
       <section className="graph-canvas-pane" aria-label="Execution topology">
         <div className="graph-toolbar">
           <label className="graph-search"><Search size={14} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a tool, server or rule…" aria-label="Search topology" />{query && <button onClick={() => setQuery('')} aria-label="Clear search"><X size={12} /></button>}</label>
-          <div className="graph-filters"><select aria-label="Filter server" value={server} onChange={(e) => setServer(e.target.value)}><option value="all">All servers</option>{servers.map((s) => <option key={s} value={s}>{s}</option>)}</select><select aria-label="Filter decision" value={decision} onChange={(e) => setDecision(e.target.value)}><option value="all">All decisions</option>{Object.entries(EDGE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}</select></div>
+          <div className="graph-filters"><Select label="Filter server" value={server} onChange={setServer} options={[{ value: 'all', label: 'All servers' }, ...servers.map((s) => ({ value: s, label: s }))]} /><Select label="Filter decision" value={decision} onChange={setDecision} options={[{ value: 'all', label: 'All decisions' }, ...Object.entries(EDGE_META).map(([key, meta]) => ({ value: key, label: meta.label }))]} /></div>
         </div>
         <div className="graph-context"><span className={`dot ${live ? 'green' : ''}`} /><span>{offline ? 'Connection unavailable · last received topology' : live ? 'Live topology' : 'Recorded topology'}</span><span className="graph-context-divider" /><span>{graph.nodes.length} nodes · {graph.edges.length} connections</span>{activeFilters && <button className="graph-text-button" onClick={clearFilters}>Clear filters</button>}</div>
         <div className="graph-viewport" ref={viewport}>
           {!loaded && !topology ? <Empty icon={<Layers size={22} />} title="Loading execution map">Retrieving the latest topology.</Empty> : !graph.nodes.length ? <Empty icon={<GitBranch size={22} />} title={activeFilters ? 'No matching paths' : 'No execution paths yet'}>{activeFilters ? <button className="btn sm" onClick={clearFilters}>Clear filters</button> : 'Connect an MCP server or run an evaluation to inspect recorded tool activity.'}</Empty> :
           <svg className="graph-svg" width={GRAPH_W * scale} height={graph.height * scale} viewBox={`0 0 ${GRAPH_W} ${graph.height}`} aria-label="Tool data flow graph">
-            <defs>{Object.entries(EDGE_META).map(([key, meta]) => <marker key={key} id={`graph-arrow-${key}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill={meta.color} /></marker>)}</defs>
+            <defs>{Object.entries(EDGE_META).map(([key, meta]) => <marker key={key} id={`graph-arrow-${key}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" style={{ fill: meta.color }} /></marker>)}</defs>
             {COLUMNS.map((column, i) => <g key={column.role}><text className="graph-column-label" x={32 + i * COL_W} y={36}>{column.label}</text><text className="graph-column-note" x={32 + i * COL_W} y={57}>{column.note}</text><line x1={32 + i * COL_W} y1={76} x2={32 + i * COL_W + NODE_W} y2={76} stroke="var(--border)" />{!graph.nodes.some((n) => n.role === column.role) && <text className="graph-column-empty" x={32 + i * COL_W} y={141}>No recorded nodes</text>}</g>)}
             {graph.edges.map((edge) => {
               const from = graph.positions.get(edge.source); const to = graph.positions.get(edge.target);
@@ -134,7 +134,7 @@ export function GraphView() {
               const dim = selection && !selected && !(selectedNode && (edge.source === selectedNode.id || edge.target === selectedNode.id));
               return <g key={edge.id} className={`graph-edge ${selected ? 'selected' : ''} ${dim ? 'muted' : ''}`} role="button" tabIndex={0} aria-label={`${nodesById.get(edge.source)?.label ?? edge.source} to ${nodesById.get(edge.target)?.label ?? edge.target}: ${EDGE_META[edge.status].label}`} onClick={() => setSelection({ kind: 'edge', id: edge.id })} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelection({ kind: 'edge', id: edge.id }); } }}>
                 <title>{EDGE_META[edge.status].label}{edge.reason ? `: ${edge.reason}` : ''}</title>
-                <path className="graph-edge-hit" d={d} /><path className="graph-edge-line" d={d} stroke={EDGE_META[edge.status].color} strokeWidth={selected ? 2.5 : 1.5} strokeDasharray={edge.status === 'BLOCKED' || edge.status === 'STEP_UP_PENDING' ? '5 5' : undefined} markerEnd={`url(#graph-arrow-${edge.status})`} />
+                <path className="graph-edge-hit" d={d} /><path className="graph-edge-line" d={d} style={{ stroke: EDGE_META[edge.status].color }} strokeWidth={selected ? 2.5 : 1.5} strokeDasharray={edge.status === 'BLOCKED' || edge.status === 'STEP_UP_PENDING' ? '5 5' : undefined} markerEnd={`url(#graph-arrow-${edge.status})`} />
               </g>;
             })}
             {graph.nodes.map((node) => {

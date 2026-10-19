@@ -5,7 +5,7 @@ import { createStage } from "./stage";
 /**
  * Wind-tunnel view of the Elytra control plane. The wing is the logo's delta
  * planform; tool calls are streamlines. Calls that cross the wing leave in
- * sage. One write meets a raised elevon at the trailing edge and stops in
+ * a neutral white. One write meets a raised elevon at the trailing edge and stops in
  * amber. Illustrative only: no runtime data.
  */
 
@@ -94,7 +94,7 @@ void main() {
 }`;
 const lineFragment = /* glsl */ `
 uniform float uTime, uTrailing;
-uniform vec3 uIdle, uSage, uAmber;
+uniform vec3 uIdle, uPassed, uAmber;
 uniform float uHeld;
 varying float vT, vSeed, vOver, vLayer, vX;
 void main() {
@@ -107,7 +107,7 @@ void main() {
   float alpha = 0.15 + pulse * 0.95;
   if (vOver > 0.5) {
     float passed = smoothstep(uTrailing - 0.2, uTrailing + 0.8, vX);
-    color = mix(uIdle, uSage, passed);
+    color = mix(uIdle, uPassed, passed);
     alpha += passed * 0.1;
   }
   if (uHeld > 0.5) {
@@ -123,9 +123,9 @@ function lineMaterial(held: boolean) {
     uniforms: {
       uTime: { value: 0 },
       uTrailing: { value: TE_X },
-      uIdle: { value: new THREE.Color(0xc9cfc2) },
-      uSage: { value: new THREE.Color(0x9bb380) },
-      uAmber: { value: new THREE.Color(0xe2a84b) },
+      uIdle: { value: new THREE.Color(0xb4b4b4) },
+      uPassed: { value: new THREE.Color(0xe6e6e6) },
+      uAmber: { value: new THREE.Color(0xf0b04f) },
       uHeld: { value: held ? 1 : 0 },
     },
     vertexShader: lineVertex,
@@ -231,9 +231,9 @@ export default function FlowField({
 
     // Wing: thin machined plate with hairline edges and panel lines.
     const wingGeometry = new THREE.ExtrudeGeometry(wingShape(), { depth: 0.05, bevelEnabled: false }).rotateX(Math.PI / 2).translate(0, 0.025, 0);
-    const wing = new THREE.Mesh(wingGeometry, new THREE.MeshStandardMaterial({ color: 0x16191b, metalness: 0.55, roughness: 0.42 }));
+    const wing = new THREE.Mesh(wingGeometry, new THREE.MeshStandardMaterial({ color: 0x151515, metalness: 0.55, roughness: 0.42 }));
     rig.add(wing);
-    rig.add(new THREE.LineSegments(new THREE.EdgesGeometry(wingGeometry, 30), new THREE.LineBasicMaterial({ color: 0xe6eadf, transparent: true, opacity: 0.6 })));
+    rig.add(new THREE.LineSegments(new THREE.EdgesGeometry(wingGeometry, 30), new THREE.LineBasicMaterial({ color: 0xe8e8e8, transparent: true, opacity: 0.6 })));
     const panel: number[] = [];
     for (let k = 1; k <= 6; k++) {
       const x = APEX_X + (k / 7) * CHORD;
@@ -245,14 +245,14 @@ export default function FlowField({
     panel.push(APEX_X + 0.15, 0.03, 0, NOTCH_X - 0.05, 0.03, 0);
     const panelGeometry = new THREE.BufferGeometry();
     panelGeometry.setAttribute("position", new THREE.Float32BufferAttribute(panel, 3));
-    rig.add(new THREE.LineSegments(panelGeometry, new THREE.LineBasicMaterial({ color: 0xe6eadf, transparent: true, opacity: 0.12 })));
+    rig.add(new THREE.LineSegments(panelGeometry, new THREE.LineBasicMaterial({ color: 0xe8e8e8, transparent: true, opacity: 0.12 })));
 
     // Raised elevon on the right trailing edge: the control surface holding the write.
     const elevonPivot = new THREE.Group();
     elevonPivot.position.set(ELEVON.hinge, 0.05, (ELEVON.z0 + ELEVON.z1) / 2);
     const elevonGeometry = new THREE.BoxGeometry(TE_X - ELEVON.hinge, 0.035, ELEVON.z1 - ELEVON.z0).translate((TE_X - ELEVON.hinge) / 2, 0, 0);
     const elevon = new THREE.Mesh(elevonGeometry, new THREE.MeshStandardMaterial({ color: 0x1d1b16, metalness: 0.5, roughness: 0.4 }));
-    elevon.add(new THREE.LineSegments(new THREE.EdgesGeometry(elevonGeometry), new THREE.LineBasicMaterial({ color: 0xe2a84b, transparent: true, opacity: 0.85, toneMapped: false })));
+    elevon.add(new THREE.LineSegments(new THREE.EdgesGeometry(elevonGeometry), new THREE.LineBasicMaterial({ color: 0xf0b04f, transparent: true, opacity: 0.85, toneMapped: false })));
     elevonPivot.add(elevon);
     elevonPivot.rotation.z = 0.62;
     rig.add(elevonPivot);
@@ -277,12 +277,12 @@ export default function FlowField({
     heldPoints.push(heldEnd);
     const heldMaterial = lineMaterial(true);
     rig.add(new THREE.LineSegments(segments([{ points: heldPoints, over: false, layer: 0, seed: 0.3 }]), heldMaterial));
-    const heldGlow = glow(0xe2a84b, 0.9);
+    const heldGlow = glow(0xf0b04f, 0.9);
     heldGlow.position.copy(heldEnd);
     rig.add(heldGlow);
     const heldGlowMaterial = heldGlow.material as THREE.SpriteMaterial;
 
-    scene.add(new THREE.HemisphereLight(0xf2f4ee, 0x0a0b0c, 1.4));
+    scene.add(new THREE.HemisphereLight(0xf2f2f2, 0x0a0b0c, 1.4));
     const key = new THREE.DirectionalLight(0xffffff, 1.6);
     key.position.set(-3, 6, 4);
     scene.add(key);
@@ -296,7 +296,7 @@ export default function FlowField({
 
     const options = {
       maxDpr: 2,
-      background: 0x07080a,
+      background: 0x080808,
       animate: motion.running,
       resize(width: number, height: number) {
         camera.aspect = width / height;

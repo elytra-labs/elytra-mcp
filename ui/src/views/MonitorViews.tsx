@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, ArrowDownToLine, ArrowRight, ArrowUpRight, CheckCheck, Filter, Fingerprint, Search, ShieldCheck, SlidersHorizontal, UserCheck, Waypoints, X } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { Badge, Card, Chain, Code, CopyButton, DecisionBadge, Dot, Empty, PageHeader, Sheet, Stat } from '../components/ui';
+import { Badge, Card, Chain, Code, CopyButton, DecisionBadge, Dot, Empty, PageHeader, Select, Sheet, Stat } from '../components/ui';
 import { clockTime, fullDate, humanize, ms, prettyJson, timeAgo, toolLabel } from '../lib/format';
 import type { InterceptionEvent } from '../types/controlPlane';
 
@@ -113,8 +113,8 @@ export function ActivityView() {
     <PageHeader title="Activity" description="Inspect tool calls, policy decisions, and the data behind them." actions={<button className="btn" disabled={!filtered.length} onClick={() => downloadJson(filtered, 'elytra-activity.json')}><ArrowDownToLine size={14} />Export {filtering ? 'filtered ' : ''}JSON</button>} />
     <div className="toolbar activity-toolbar">
       <div className="input-wrap activity-search"><Search size={14} /><input ref={search} className="input" aria-label="Search activity" aria-keyshortcuts="/" placeholder="Search tools, sessions, or rules…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape' && q) { e.stopPropagation(); setQ(''); } }} /><span className="kbd activity-kbd" aria-hidden="true">/</span></div>
-      <select className="select" aria-label="Filter by decision" value={decision} onChange={(e) => setDecision(e.target.value)}><option value="all">All decisions</option>{['ALLOW', 'TAINT_PROPAGATE', 'BLOCK_SECOND_HOP', 'STEP_UP_REQUIRED', 'SCHEMA_DRIFT_BLOCK'].map((v) => <option key={v} value={v}>{humanize(v)}</option>)}</select>
-      <select className="select" aria-label="Filter by server" value={server} onChange={(e) => setServer(e.target.value)}><option value="all">All servers</option>{servers.map((s) => <option key={s}>{s}</option>)}</select>
+      <Select label="Filter by decision" value={decision} onChange={setDecision} options={[{ value: 'all', label: 'All decisions' }, ...['ALLOW', 'TAINT_PROPAGATE', 'BLOCK_SECOND_HOP', 'STEP_UP_REQUIRED', 'SCHEMA_DRIFT_BLOCK'].map((v) => ({ value: v, label: humanize(v) }))]} />
+      <Select label="Filter by server" value={server} onChange={setServer} options={[{ value: 'all', label: 'All servers' }, ...servers.map((s) => ({ value: s, label: s }))]} />
       {filtering && <button className="btn ghost sm" onClick={clear}><X size={13} />Clear filters</button>}
     </div>
     {session && <div className="activity-chip-row"><span className="activity-chip"><span className="subtle">Session</span><span className="mono">{session}</span><button className="btn ghost icon xs" aria-label="Remove session filter" onClick={() => setSession(null)}><X size={12} /></button></span></div>}
