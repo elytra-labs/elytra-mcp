@@ -19,13 +19,16 @@ import { scrollToElement, SmoothScroll } from "./motion/SmoothScroll";
 
 const CLOUD = import.meta.env.VITE_DEPLOY_TARGET === 'cloud';
 
-/** Hosted sign-in is offered only once the deployment's backend answers; until then the site leads with the local install. */
+/** Hosted sign-in is offered only once the deployment accepts devices; until then the site leads with the local install. */
 let hostedCheck: Promise<boolean> | null = null;
 function useHostedReady() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     if (!CLOUD) return;
-    hostedCheck ??= fetch("/api/cloud/v1/config").then((r) => r.ok).catch(() => false);
+    hostedCheck ??= fetch("/api/cloud/v1/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((config) => config?.enrollment_enabled === true)
+      .catch(() => false);
     let live = true;
     void hostedCheck.then((ok) => live && setReady(ok));
     return () => { live = false; };

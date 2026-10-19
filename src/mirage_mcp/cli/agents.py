@@ -220,14 +220,14 @@ class HookInstaller:
         files = {
             root / ".agents" / "plugins" / "marketplace.json": {
                 "name": CODEX_MARKETPLACE, "description": "Elytra guardrails installed by elytra setup",
-                "owner": {"name": "Elytra", "url": "https://elytra-gray.vercel.app"},
+                "owner": {"name": "Elytra", "url": "https://elytra-labs.vercel.app"},
                 "plugins": [{"name": CODEX_PLUGIN, "description": "Checks Codex's shell, file and web actions against your Elytra guardrails",
                              "source": f"./plugins/{CODEX_PLUGIN}", "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
                              "version": "0.4.0", "category": "security", "tags": ["security", "guardrails"]}],
             },
             plugin / ".codex-plugin" / "plugin.json": {
                 "name": CODEX_PLUGIN, "description": "Elytra guardrails for Codex actions", "version": "0.4.0",
-                "author": {"name": "Elytra", "url": "https://elytra-gray.vercel.app"}, "homepage": "https://github.com/elytra-labs/elytra-mcp",
+                "author": {"name": "Elytra", "url": "https://elytra-labs.vercel.app"}, "homepage": "https://github.com/elytra-labs/elytra-mcp",
             },
             plugin / "hooks" / "hooks.json": {"hooks": {
                 "PreToolUse": [{"hooks": [{"type": "command", "command": hook_command("pre", "codex"), "timeout": timeout}]}],

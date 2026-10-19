@@ -4,7 +4,7 @@ Local guardrails for coding agents. Elytra checks what Claude Code, Codex, Grok 
 
 Elytra is early access software. Everything runs on your machine: the runtime, the console and the decision records. There is no account to create.
 
-Website and documentation: https://elytra-gray.vercel.app
+Website and documentation: https://elytra-labs.vercel.app
 
 ## Install
 
@@ -48,7 +48,7 @@ When an action needs you, Claude Code and Grok show their own prompt with Elytra
 - If the runtime is not running, actions go through with a visible warning, unless you set up with `--fail-closed`.
 - Remote HTTP MCP servers are not proxied; their calls are seen through agent hooks.
 
-Read [what Elytra does and does not establish](https://elytra-gray.vercel.app/security) before relying on it.
+Read [what Elytra does and does not establish](https://elytra-labs.vercel.app/security) before relying on it.
 
 ## Python integration
 
@@ -62,7 +62,7 @@ run = owner.create_run(intent="Inspect an issue", grants=[])
 scoped = owner.for_run(run["run_id"], run["run_token"])
 ```
 
-See the [documentation](https://elytra-gray.vercel.app/docs#integration) for exact grants, approvals and the stdio bridge.
+See the [documentation](https://elytra-labs.vercel.app/docs#integration) for exact grants, approvals and the stdio bridge.
 
 ## Upgrade and uninstall
 

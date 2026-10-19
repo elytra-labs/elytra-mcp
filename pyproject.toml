@@ -35,10 +35,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://elytra-gray.vercel.app"
-Documentation = "https://elytra-gray.vercel.app/docs"
-Security = "https://elytra-gray.vercel.app/security"
-Changelog = "https://elytra-gray.vercel.app/changelog"
+Homepage = "https://elytra-labs.vercel.app"
+Documentation = "https://elytra-labs.vercel.app/docs"
+Security = "https://elytra-labs.vercel.app/security"
+Changelog = "https://elytra-labs.vercel.app/changelog"
 Source = "https://github.com/elytra-labs/elytra-mcp"
 Issues = "https://github.com/elytra-labs/elytra-mcp/issues"
 

@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/elytra-labs/elytra-mcp/security/advisories/new
     about: Report privately. Do not open a public issue.
   - name: Documentation
-    url: https://elytra-gray.vercel.app/docs
+    url: https://elytra-labs.vercel.app/docs
     about: Setup, guardrails and the Python integration.
