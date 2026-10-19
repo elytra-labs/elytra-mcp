@@ -1,0 +1,10 @@
+# MIRAGE-MCP Custom Capability & Trust Policy
+mode: strict
+allow_safe_select: true
+
+overrides:
+  github.get_repo_metadata: SOURCE_TRUSTED
+  stripe.get_customer: SOURCE_TRUSTED
+  jira.get_project_schema: SOURCE_TRUSTED
+  postgres.get_schema: SOURCE_TRUSTED
+  filesystem.read_local_config: SOURCE_TRUSTED

@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "elytra-mcp"
+version = "0.4.0a2"
+description = "Local guardrails for coding agents: check what Claude Code, Codex, Grok and Antigravity do before it runs"
+readme = "docs/PYPI.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+  { name = "Yosef Shammout" }
+]
+keywords = ["mcp", "security", "ai-agents", "guardrails", "claude-code", "codex", "prompt-injection"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+]
+dependencies = []
+
+[project.optional-dependencies]
+cloud = ["cryptography>=43.0"]
+dev = [
+  "pytest>=7.4.0",
+]
+
+[project.urls]
+Homepage = "https://elytra-gray.vercel.app"
+Documentation = "https://elytra-gray.vercel.app/docs"
+Security = "https://elytra-gray.vercel.app/security"
+Changelog = "https://elytra-gray.vercel.app/changelog"
+Source = "https://github.com/elytra-labs/elytra-mcp"
+Issues = "https://github.com/elytra-labs/elytra-mcp/issues"
+
+[project.scripts]
+elytra = "mirage_mcp.cli.main:main"
+mirage-mcp = "mirage_mcp.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mirage_mcp = ["web/**/*", "web/*", "evaluation/*.py", "catalog/*.json"]

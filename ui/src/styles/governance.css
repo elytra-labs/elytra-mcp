@@ -1,0 +1,56 @@
+.governance-context { display: flex; align-items: center; gap: 10px; margin: -3px 0 26px; color: var(--text-3); font-size: 12px; }
+.governance-context > svg { flex-shrink: 0; }
+.governance-toolbar { flex-wrap: wrap; margin-bottom: 16px; }
+.governance-search { width: 280px; max-width: 100%; }
+.governance-result-count { margin-left: auto; font-size: 12px; }
+.governance-table-body { padding: 0; }
+.governance-text-button { padding: 0; border: 0; background: transparent; color: var(--text); text-align: left; font-weight: 500; cursor: pointer; }
+.governance-text-button:hover { color: var(--accent); }
+.governance-inline-separator { padding: 0 5px; color: var(--text-4); }
+.governance-risk { font-variant-numeric: tabular-nums; }
+.governance-risk.red { color: var(--red); }
+.governance-risk.amber { color: var(--amber); }
+.governance-footnote { margin: 16px 0 0; color: var(--text-3); font-size: 12px; line-height: 1.65; }
+.governance-detail-stack { display: flex; flex-direction: column; gap: 26px; }
+.governance-detail-stack .governance-footnote { margin-top: 0; }
+.governance-detail-status { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12px; }
+.governance-reason { margin: 0; color: var(--text-2); line-height: 1.7; }
+.governance-break { overflow-wrap: anywhere; }
+.governance-policy { padding: 22px 24px 18px; border-bottom: 1px solid var(--border); }
+.governance-policy:last-child { border-bottom: 0; }
+.governance-policy-heading, .governance-policy-title, .governance-policy-controls, .governance-policy-bottom, .governance-patterns { display: flex; align-items: center; gap: 12px; }
+.governance-policy-heading, .governance-policy-bottom { justify-content: space-between; }
+.governance-policy-title { flex-wrap: wrap; gap: 10px; }
+.governance-policy-title > button { font-size: 13px; }
+.governance-policy-controls { flex-shrink: 0; font-size: 12px; }
+.governance-policy-description { margin: 9px 0 16px; max-width: 720px; color: var(--text-2); font-size: 12px; line-height: 1.7; }
+.governance-patterns { gap: 10px; flex-wrap: wrap; }
+.governance-patterns > .mono { color: var(--text-2); padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; overflow-wrap: anywhere; }
+.governance-policy-threshold { font-size: 11px; color: var(--text-3); margin-left: 4px; }
+.governance-policy-id { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--text-3); font-size: 11px; margin-top: 12px; }
+.governance-policy-id .mono { font-size: 10px; }
+.governance-form { display: flex; flex-direction: column; gap: 21px; }
+.governance-form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.governance-form-switch { display: flex; justify-content: space-between; gap: 16px; align-items: center; border-top: 1px solid var(--border); padding-top: 20px; }
+.governance-form-switch .field-hint { margin-top: 4px; }
+.governance-error { padding: 10px 12px; border: 1px solid var(--red-border); background: var(--red-soft); color: var(--red); border-radius: var(--radius-sm); font-size: 12px; }
+.governance-disabled { opacity: .5; pointer-events: none; }
+.governance-integrity-notice { border-left: 2px solid var(--amber); padding-left: 14px; }
+.governance-integrity-notice p { color: var(--text-2); font-size: 12px; margin: 0; overflow-wrap: anywhere; }
+.governance-description-preview { margin: 0; color: var(--text-2); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.governance-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.governance-expiry { font-size: 11.5px; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.governance-expiry.urgent { color: var(--amber); }
+.governance-expiry.expired { color: var(--text-3); text-decoration: line-through; text-decoration-color: var(--border-strong, var(--border)); }
+.governance-footer-note { margin-right: auto; align-self: center; color: var(--text-3); font-size: 11.5px; line-height: 1.45; max-width: 260px; }
+@media (max-width: 720px) {
+  .governance-policy { padding: 18px 16px; }
+  .governance-policy-heading { align-items: flex-start; }
+  .governance-policy-controls > span:first-child { display: none; }
+  .governance-policy-bottom { gap: 8px; align-items: flex-end; }
+  .governance-patterns { gap: 7px; }
+  .governance-policy-threshold { width: 100%; margin: 0; }
+  .governance-form-pair { grid-template-columns: 1fr; }
+  .governance-search { width: 100%; }
+  .governance-page .table { min-width: 640px; }
+}

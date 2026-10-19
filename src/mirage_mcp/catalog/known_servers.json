@@ -1,0 +1,95 @@
+{
+  "filesystem": {
+    "label": "Filesystem",
+    "match": ["@modelcontextprotocol/server-filesystem", "mcp-server-filesystem"],
+    "note": "Local file reads are treated as trusted. Files downloaded from elsewhere can still carry instructions.",
+    "tools": {
+      "read_file": "SOURCE_TRUSTED", "read_text_file": "SOURCE_TRUSTED", "read_media_file": "SOURCE_TRUSTED",
+      "read_multiple_files": "SOURCE_TRUSTED", "list_directory": "SOURCE_TRUSTED", "list_directory_with_sizes": "SOURCE_TRUSTED",
+      "directory_tree": "SOURCE_TRUSTED", "search_files": "SOURCE_TRUSTED", "get_file_info": "SOURCE_TRUSTED",
+      "list_allowed_directories": "SOURCE_TRUSTED",
+      "write_file": "SINK_PRIVILEGED_WRITE", "edit_file": "SINK_PRIVILEGED_WRITE", "create_directory": "SINK_PRIVILEGED_WRITE",
+      "move_file": "SINK_PRIVILEGED_WRITE"
+    }
+  },
+  "github": {
+    "label": "GitHub",
+    "match": ["@modelcontextprotocol/server-github", "github-mcp-server", "ghcr.io/github/github-mcp-server"],
+    "note": "Issues, pull requests and code are untrusted input. Public comments and issues publish data.",
+    "tools": {
+      "get_issue": "SOURCE_UNTRUSTED", "list_issues": "SOURCE_UNTRUSTED", "search_issues": "SOURCE_UNTRUSTED",
+      "get_issue_comments": "SOURCE_UNTRUSTED", "get_pull_request": "SOURCE_UNTRUSTED", "list_pull_requests": "SOURCE_UNTRUSTED",
+      "get_pull_request_files": "SOURCE_UNTRUSTED", "get_pull_request_comments": "SOURCE_UNTRUSTED",
+      "get_pull_request_reviews": "SOURCE_UNTRUSTED", "get_pull_request_status": "SOURCE_UNTRUSTED",
+      "get_file_contents": "SOURCE_UNTRUSTED", "search_code": "SOURCE_UNTRUSTED", "search_repositories": "SOURCE_UNTRUSTED",
+      "search_users": "SOURCE_UNTRUSTED", "list_commits": "SOURCE_UNTRUSTED",
+      "create_or_update_file": "SINK_PRIVILEGED_WRITE", "push_files": "SINK_PRIVILEGED_WRITE", "create_branch": "SINK_PRIVILEGED_WRITE",
+      "create_pull_request": "SINK_PRIVILEGED_WRITE", "merge_pull_request": "SINK_PRIVILEGED_WRITE", "update_issue": "SINK_PRIVILEGED_WRITE",
+      "update_pull_request_branch": "SINK_PRIVILEGED_WRITE", "create_repository": "SINK_PRIVILEGED_WRITE", "fork_repository": "SINK_PRIVILEGED_WRITE",
+      "create_issue": "SINK_EXFILTRATION", "add_issue_comment": "SINK_EXFILTRATION", "create_pull_request_review": "SINK_EXFILTRATION"
+    }
+  },
+  "git": {
+    "label": "Git",
+    "match": ["mcp-server-git"],
+    "tools": {
+      "git_status": "SOURCE_TRUSTED", "git_diff_unstaged": "SOURCE_TRUSTED", "git_diff_staged": "SOURCE_TRUSTED", "git_diff": "SOURCE_TRUSTED",
+      "git_log": "SOURCE_TRUSTED", "git_show": "SOURCE_TRUSTED", "git_branch": "SOURCE_TRUSTED",
+      "git_add": "SINK_PRIVILEGED_WRITE", "git_commit": "SINK_PRIVILEGED_WRITE", "git_reset": "SINK_PRIVILEGED_WRITE",
+      "git_create_branch": "SINK_PRIVILEGED_WRITE", "git_checkout": "SINK_PRIVILEGED_WRITE", "git_init": "SINK_PRIVILEGED_WRITE"
+    }
+  },
+  "postgres": {
+    "label": "PostgreSQL",
+    "match": ["@modelcontextprotocol/server-postgres"],
+    "note": "This server runs read-only queries.",
+    "tools": { "query": "SOURCE_TRUSTED" }
+  },
+  "sqlite": {
+    "label": "SQLite",
+    "match": ["mcp-server-sqlite"],
+    "tools": {
+      "read_query": "SOURCE_TRUSTED", "list_tables": "SOURCE_TRUSTED", "describe_table": "SOURCE_TRUSTED",
+      "write_query": "SINK_PRIVILEGED_WRITE", "create_table": "SINK_PRIVILEGED_WRITE", "append_insight": "SINK_PRIVILEGED_WRITE"
+    }
+  },
+  "slack": {
+    "label": "Slack",
+    "match": ["@modelcontextprotocol/server-slack"],
+    "note": "Channel history is untrusted input. Posting sends data to other people.",
+    "tools": {
+      "slack_list_channels": "SOURCE_UNTRUSTED", "slack_get_channel_history": "SOURCE_UNTRUSTED", "slack_get_thread_replies": "SOURCE_UNTRUSTED",
+      "slack_get_users": "SOURCE_UNTRUSTED", "slack_get_user_profile": "SOURCE_UNTRUSTED",
+      "slack_post_message": "SINK_EXFILTRATION", "slack_reply_to_thread": "SINK_EXFILTRATION", "slack_add_reaction": "SINK_EXFILTRATION"
+    }
+  },
+  "fetch": {
+    "label": "Fetch",
+    "match": ["mcp-server-fetch"],
+    "note": "Fetched pages are untrusted input. A URL can also carry data out, so review fetch use after sensitive reads.",
+    "tools": { "fetch": "SOURCE_UNTRUSTED" }
+  },
+  "memory": {
+    "label": "Memory",
+    "match": ["@modelcontextprotocol/server-memory"],
+    "tools": {
+      "read_graph": "SOURCE_TRUSTED", "search_nodes": "SOURCE_TRUSTED", "open_nodes": "SOURCE_TRUSTED",
+      "create_entities": "SINK_PRIVILEGED_WRITE", "create_relations": "SINK_PRIVILEGED_WRITE", "add_observations": "SINK_PRIVILEGED_WRITE",
+      "delete_entities": "SINK_PRIVILEGED_WRITE", "delete_observations": "SINK_PRIVILEGED_WRITE", "delete_relations": "SINK_PRIVILEGED_WRITE"
+    }
+  },
+  "playwright": {
+    "label": "Playwright browser",
+    "match": ["@playwright/mcp"],
+    "note": "Web pages are untrusted input. Browser actions can submit forms and send data.",
+    "tools": {
+      "browser_navigate": "SOURCE_UNTRUSTED", "browser_snapshot": "SOURCE_UNTRUSTED", "browser_take_screenshot": "SOURCE_UNTRUSTED",
+      "browser_console_messages": "SOURCE_UNTRUSTED", "browser_network_requests": "SOURCE_UNTRUSTED", "browser_tabs": "SOURCE_UNTRUSTED",
+      "browser_click": "SINK_EXFILTRATION", "browser_type": "SINK_EXFILTRATION", "browser_fill_form": "SINK_EXFILTRATION",
+      "browser_select_option": "SINK_EXFILTRATION", "browser_press_key": "SINK_EXFILTRATION", "browser_evaluate": "SINK_EXFILTRATION",
+      "browser_file_upload": "SINK_EXFILTRATION", "browser_drag": "SINK_EXFILTRATION", "browser_hover": "SINK_PRIVILEGED_WRITE",
+      "browser_navigate_back": "SINK_PRIVILEGED_WRITE", "browser_close": "SINK_PRIVILEGED_WRITE", "browser_resize": "SINK_PRIVILEGED_WRITE",
+      "browser_wait_for": "SOURCE_UNTRUSTED", "browser_handle_dialog": "SINK_PRIVILEGED_WRITE"
+    }
+  }
+}

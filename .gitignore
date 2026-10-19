@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.venv/
+venv/
+
+# Node / UI
+node_modules/
+ui/node_modules/
+ui/dist/
+
+# Runtime DB
+.mirage/
+
+# OS / IDE
+.DS_Store
+*.bak
+
+# Browser inspection artifacts
+.playwright-cli/
+output/playwright/
+
+# Local credentials and release staging
+.elytra/
+.venv*/
+website/.git/
+website/dist/
+output/release/
+
+# Separate website source repository
+/website/
+
+# Hosted deployment local state
+cloud/.dev.vars
+cloud/.wrangler/
+ui/dist-cloud/
+supabase/.temp/
+supabase/.branches/
+.env*
+!.env.example
+
+/.wrangler/
+/.vercel/
+.vercel

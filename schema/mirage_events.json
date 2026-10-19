@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MirageMCPBlastRadiusAndTelemetrySchema",
+  "type": "object",
+  "required": [
+    "scan_id",
+    "timestamp",
+    "workspace_name",
+    "risk_score",
+    "lethal_trifecta_count",
+    "nodes",
+    "edges",
+    "live_events"
+  ],
+  "properties": {
+    "scan_id": { "type": "string" },
+    "timestamp": { "type": "string" },
+    "workspace_name": { "type": "string" },
+    "risk_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "lethal_trifecta_count": { "type": "integer", "minimum": 0 },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "server", "tool_name", "category", "risk_level", "description"],
+        "properties": {
+          "id": { "type": "string" },
+          "server": { "type": "string" },
+          "tool_name": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": [
+              "SOURCE_UNTRUSTED",
+              "SOURCE_TRUSTED",
+              "CONTEXT_HUB",
+              "SINK_PRIVILEGED_WRITE",
+              "SINK_EXFILTRATION"
+            ]
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "HIGH_INGEST",
+              "LOW_READ",
+              "CRITICAL_BRIDGE",
+              "CRITICAL_SINK",
+              "HIGH_EXFIL"
+            ]
+          },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "source", "target", "hop", "status", "label"],
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "hop": { "type": "integer", "enum": [1, 2] },
+          "status": {
+            "type": "string",
+            "enum": ["TAINT_VECTOR", "CLEAN_VECTOR", "LETHAL_BLAST_PATH"]
+          },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "live_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event_id", "timestamp_ms", "hop", "tool", "category", "verdict", "latency_ms"],
+        "properties": {
+          "event_id": { "type": "string" },
+          "timestamp_ms": { "type": "number" },
+          "hop": { "type": "integer", "enum": [1, 2] },
+          "tool": { "type": "string" },
+          "category": { "type": "string" },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "TAINT_RECORDED",
+              "CLEAN_READ",
+              "ALLOWED_READ",
+              "ALLOWED_CLEAN_PATH",
+              "BLOCKED_SECOND_HOP",
+              "BLOCKED_SECOND_HOP_TOPOLOGY"
+            ]
+          },
+          "latency_ms": { "type": "number" },
+          "extracted_taint_tokens": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "payload_preview": { "type": "string" },
+          "taint_Origin_node": { "type": "string" },
+          "taint_origin": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "matched_taint_tokens": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "blocked_args": { "type": "string" }
+        }
+      }
+    }
+  }
+}

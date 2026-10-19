@@ -1,0 +1,12 @@
+include README.md SECURITY.md CHANGELOG.md CONTRIBUTING.md TRADEMARKS.md LICENSE setup.py
+recursive-include ui/dist *
+recursive-include benchmarks *.py
+recursive-include src/mirage_mcp *.py *.json
+global-exclude *.db *.db-wal *.db-shm *.token *.pyc
+include ui/package.json ui/package-lock.json ui/index.html ui/tsconfig.json ui/vite.config.ts
+recursive-include ui/src *
+recursive-include ui/public *
+recursive-include docs *.md *.json
+recursive-include tests *.py
+recursive-include scripts *.py
+recursive-include schema *.json

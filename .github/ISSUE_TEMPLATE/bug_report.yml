@@ -1,0 +1,37 @@
+name: Bug report
+description: Something Elytra did that it should not have, or did not do that it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Security vulnerabilities: do not file them here. Use private vulnerability reporting (Security tab). Never paste tokens, ~/.elytra files or real agent configs."
+  - type: input
+    id: version
+    attributes:
+      label: Elytra version
+      description: Output of `pip show elytra-mcp`
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options: [Claude Code, Codex, Grok, Antigravity, Cursor, Claude Desktop, Other / Python integration]
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: macOS 26, Ubuntu 24.04, ...
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: Include the exact command or tool call (redacted) and Elytra's message.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
