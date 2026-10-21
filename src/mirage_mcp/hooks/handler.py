@@ -7,11 +7,11 @@ opinion, so the agent's own approval and sandbox rules still apply.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -24,23 +24,38 @@ GATEWAY = "http://127.0.0.1:8765"
 # Antigravity does not report it (a skip-permissions run would auto-approve an ask), so it waits for Elytra.
 ASK_CAPABLE = {"claude-code", "grok"}
 NON_INTERACTIVE_MODES = {"bypassPermissions", "dontAsk"}
+SESSION_TTL = 300  # Reuse a conversation's session for this long before checking the host process again.
+READS = {"read_local", "web_read", "web_read_trusted"}
+RESPONSE_KEYS = ("tool_response", "toolResponse", "tool_output", "toolOutput", "output", "response", "result")
 
 
-@dataclass
-class HookCall:
-    agent: str
-    tool_name: str
-    tool_input: dict
-    call_id: str
-    permission_mode: str | None
+class _Record:
+    """Minimal value object. Plain classes keep the hook's start-up fast (dataclasses import inspect)."""
+    __slots__ = ()
+
+    def __eq__(self, other):
+        return type(other) is type(self) and all(getattr(self, k) == getattr(other, k) for k in self.__slots__)
+
+    def __repr__(self):
+        return f"{type(self).__name__}(" + ", ".join(f"{k}={getattr(self, k)!r}" for k in self.__slots__) + ")"
 
 
-@dataclass
-class Verdict:
-    decision: str  # "none", "deny", "ask"
-    reason: str = ""
-    message: str = ""  # shown to the user without blocking
-    benign: bool = False  # a read or no-op Elytra allowed (Antigravity needs an explicit decision)
+class HookCall(_Record):
+    __slots__ = ("agent", "tool_name", "tool_input", "call_id", "permission_mode", "cwd", "conversation", "response")
+
+    def __init__(self, agent: str, tool_name: str, tool_input: dict, call_id: str, permission_mode: str | None,
+                 cwd: str = "", conversation: str = "", response: object = None):
+        self.agent, self.tool_name, self.tool_input, self.call_id = agent, tool_name, tool_input, call_id
+        self.permission_mode, self.cwd, self.conversation, self.response = permission_mode, cwd, conversation, response
+
+
+class Verdict(_Record):
+    """decision is "none", "deny" or "ask". message is shown without blocking; benign marks a read or no-op
+    Elytra allowed (Antigravity needs an explicit decision)."""
+    __slots__ = ("decision", "reason", "message", "benign")
+
+    def __init__(self, decision: str, reason: str = "", message: str = "", benign: bool = False):
+        self.decision, self.reason, self.message, self.benign = decision, reason, message, benign
 
 
 def detect(payload: dict, hint: str | None) -> HookCall:
@@ -59,7 +74,12 @@ def detect(payload: dict, hint: str | None) -> HookCall:
         use_id = payload.get("tool_use_id") or ""
     mode = payload.get("permission_mode") or payload.get("permissionMode")
     safe_id = re.sub(r"[^A-Za-z0-9_.:-]", "_", str(use_id))[:180] or "unknown"
-    return HookCall(agent, str(name), tool_input if isinstance(tool_input, dict) else {}, "hook_" + safe_id, mode)
+    roots = payload.get("workspace_roots") or payload.get("workspaceRoots") or []
+    cwd = payload.get("cwd") or payload.get("workingDirectory") or (roots[0] if isinstance(roots, list) and roots else "") or ""
+    conversation = payload.get("session_id") or payload.get("sessionId") or payload.get("conversation_id") or payload.get("conversationId") or ""
+    response = next((payload[k] for k in RESPONSE_KEYS if k in payload), None)
+    return HookCall(agent, str(name), tool_input if isinstance(tool_input, dict) else {}, "hook_" + safe_id, mode,
+                    str(cwd)[:4096], str(conversation)[:200], response)
 
 
 def render(agent: str, event: str, verdict: Verdict) -> str:
@@ -123,7 +143,7 @@ def _describe(call: HookCall, action, label: str) -> str:
 def decide(call: HookCall, host: dict | None, open_session: Callable[[dict], object], sleep=time.sleep) -> Verdict:
     from mirage_mcp.sdk import RuntimeAPIError
 
-    action = classify(call.tool_name, call.tool_input)
+    action = classify(call.tool_name, call.tool_input, {"cwd": call.cwd} if call.cwd else None)
     if action.kind == "protected":
         return Verdict("deny", f"Elytra: {action.reason}.")
     if action.kind == "ignore":
@@ -138,9 +158,8 @@ def decide(call: HookCall, host: dict | None, open_session: Callable[[dict], obj
         client = open_session(host)
         if action.kind == "mcp":
             client.observe_tool(server, tool)
-        decision = client.evaluate(server, tool, action.arguments, call.call_id, notify=not interactive)
+        decision = client.evaluate(server, tool, action.arguments, call.call_id, notify=not interactive, claim=True)
         if decision["decision"] == "ALLOW":
-            client.claim(call.call_id, decision["permit"], action.arguments)
             return Verdict("none", benign=action.kind == "builtin" and action.tool in {"read_local", "web_read"})
         reason = decision.get("reason") or "Not authorized by Elytra"
         label = f"{server}.{tool}"
@@ -184,21 +203,66 @@ def complete(call: HookCall, host: dict | None, open_session: Callable[[dict], o
     from mirage_mcp.sdk import RuntimeAPIError
     if not host:
         return
-    action = classify(call.tool_name, call.tool_input)
+    action = classify(call.tool_name, call.tool_input, {"cwd": call.cwd} if call.cwd else None)
     if action.kind not in {"builtin", "mcp"}:
         return
     try:
-        open_session(host).complete(call.call_id, {"recorded_by": "elytra-hook"})
-    except (RuntimeAPIError, KeyError, ValueError):
-        pass  # Calls that were not claimed (no opinion, cancelled, deferred) have nothing to complete.
+        client = open_session(host)
+        client.complete(call.call_id, {"recorded_by": "elytra-hook"})
+    except (RuntimeAPIError, KeyError, ValueError, RuntimeError):
+        return  # Calls that were not claimed (no opinion, cancelled, deferred) have nothing to complete.
+    # Inspect what a read brought into the agent's context. Findings raise the session's taint; a clean
+    # untrusted read is marked as inspected. Results are never sent anywhere, only the verdict and a snippet.
+    if call.response is not None and (action.kind == "mcp" or action.tool in READS):
+        from mirage_mcp.security.injection_guard import scan
+        try:
+            client.report_scan(call.call_id, scan(call.response))
+        except (RuntimeAPIError, KeyError, ValueError, RuntimeError):
+            pass
 
 
-def _open(host: dict):
+def _conversation_cache(host: dict, conversation: str, home: Path | None = None) -> Path:
+    digest = hashlib.sha256(f"{host['host_id']}:{conversation}".encode()).hexdigest()[:32]
+    return ((home / ".elytra" / "hosts") if home else HOSTS_DIR) / "sessions" / f"{digest}.json"
+
+
+def _open(host: dict, conversation: str = "", home: Path | None = None):
+    """The agent's session: one per conversation when the agent reports one, else one per agent process.
+
+    A conversation's session is cached (0600) so later calls skip identifying the host process; it is
+    reopened when the runtime rejects it or after SESSION_TTL.
+    """
     from mirage_mcp.proxy.host_session import HostSessionClient, host_session_key
-    return HostSessionClient(host["host_id"], host["host_token"], host_session_key(), host.get("gateway", GATEWAY))
+    gateway = host.get("gateway", GATEWAY)
+    if not conversation:
+        return HostSessionClient(host["host_id"], host["host_token"], host_session_key(), gateway)
+    key = hashlib.sha256(f"{host['host_id']}:conversation:{conversation}".encode()).hexdigest()[:32]
+    cache = _conversation_cache(host, conversation, home)
+    resume = None
+    try:
+        if time.time() - cache.stat().st_mtime < SESSION_TTL:
+            saved = json.loads(cache.read_text())
+            if saved.get("host_id") == host["host_id"] and saved.get("gateway") == gateway:
+                resume = saved
+    except (OSError, ValueError):
+        resume = None
+
+    def remember(session: dict):
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            temp = cache.with_suffix(".tmp")
+            fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as stream:
+                json.dump({"host_id": host["host_id"], "gateway": gateway, "run_id": session["run_id"], "run_token": session["run_token"],
+                           "approval_window": session.get("approval_window")}, stream)
+            os.replace(temp, cache)
+        except OSError:
+            pass  # Caching is an optimization; the session still works.
+
+    return HostSessionClient(host["host_id"], host["host_token"], key, gateway, parent_key=host_session_key, resume=resume, on_open=remember)
 
 
-def run(event: str, stdin: str, hint: str | None = None, home: Path | None = None, open_session=_open) -> str:
+def run(event: str, stdin: str, hint: str | None = None, home: Path | None = None, open_session=None) -> str:
     try:
         payload = json.loads(stdin or "{}")
     except ValueError:
@@ -207,6 +271,8 @@ def run(event: str, stdin: str, hint: str | None = None, home: Path | None = Non
         payload = {}
     call = detect(payload, hint)
     host = load_host(call.agent, home)
+    if open_session is None:
+        open_session = lambda h: _open(h, call.conversation, home)
     if event == "post":
         complete(call, host, open_session)
         return render(call.agent, "post", Verdict("none"))

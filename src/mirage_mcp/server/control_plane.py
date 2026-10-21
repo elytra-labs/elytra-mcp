@@ -396,10 +396,11 @@ class ControlPlaneServer:
                         authorization = self.headers.get("Authorization", "")
                         if not authorization.startswith("Bearer "):
                             raise PermissionError("A host credential is required")
-                        self._json(service.runtime.open_host_session(body.get("host_id"), authorization[7:], body.get("session_key")))
+                        self._json(service.runtime.open_host_session(body.get("host_id"), authorization[7:], body.get("session_key"), body.get("parent_key")))
                         return
                     scoped = {"/api/v1/runtime/tools/register", "/api/v1/runtime/tools", "/api/v1/runtime/tools/observe", "/api/v1/runtime/evaluate", "/api/v1/runtime/claim",
-                              "/api/v1/runtime/complete", "/api/v1/runtime/cancel", "/api/v1/runtime/finish", "/api/v1/runtime/uncertain", "/api/v1/runtime/validate"}
+                              "/api/v1/runtime/complete", "/api/v1/runtime/cancel", "/api/v1/runtime/finish", "/api/v1/runtime/uncertain", "/api/v1/runtime/validate",
+                              "/api/v1/runtime/sources/scan"}
                     if path in scoped:
                         self._scoped(path, body)
                         return
@@ -424,6 +425,8 @@ class ControlPlaneServer:
                             service.link_connector = None
                         self._json({'linked': False})
                     elif path == "/api/v1/pair": self._json({"pairing_url": service.pairing_url()})
+                    elif path.startswith("/api/v1/sessions/") and path.endswith("/trust"):
+                        self._json(runtime.reset_session_trust(unquote(path.split("/")[-2])))
                     elif path in ("/api/v1/runs", "/api/v1/runtime/runs"):
                         self._json(runtime.create_run(intent=body.get("intent", ""), grants=body.get("grants", []), ttl_seconds=body.get("ttl_seconds", 3600)), 201)
                     elif path == "/api/v1/schema-pins/acknowledge":
@@ -475,7 +478,7 @@ class ControlPlaneServer:
                 elif path.endswith("/validate"):
                     result = runtime.validate_run(run_id, token)
                 elif path.endswith("/evaluate"):
-                    result = runtime.evaluate(run_id, token, body["server_id"], body["tool_name"], body.get("arguments", {}), body["call_id"], notify=body.get("notify", True) is not False)
+                    result = runtime.evaluate(run_id, token, body["server_id"], body["tool_name"], body.get("arguments", {}), body["call_id"], notify=body.get("notify", True) is not False, claim=body.get("claim") is True)
                 elif path.endswith("/claim"):
                     result = runtime.claim_execution(run_id, token, body["call_id"], body["permit"], body.get("arguments", {}))
                 elif path.endswith("/complete"):
@@ -486,6 +489,8 @@ class ControlPlaneServer:
                     result = runtime.cancel_call(run_id, token, body["call_id"])
                 elif path.endswith("/finish"):
                     result = runtime.finish_run(run_id, token, body.get("status", "COMPLETED"))
+                elif path.endswith("/sources/scan"):
+                    result = runtime.report_source_scan(run_id, token, body["call_id"], body.get("findings", []))
                 else:
                     raise ValueError("Unknown run operation")
                 self._json(result)

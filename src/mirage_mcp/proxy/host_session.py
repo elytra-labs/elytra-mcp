@@ -55,17 +55,31 @@ class HostSessionClient:
 
     _RETRYABLE = {"register_tools", "evaluate", "observe_tool"}
 
-    def __init__(self, host_id: str, host_token: str, session_key: str, base_url: str):
+    def __init__(self, host_id: str, host_token: str, session_key: str, base_url: str, parent_key=None, resume: dict | None = None, on_open=None):
+        """`parent_key` (a value or a callable computed only when needed) makes this a conversation inside a host process.
+        `resume` reuses an already opened session without contacting the runtime; it reopens on first rejection."""
         self._args = (host_id, host_token, session_key)
         self._base_url = base_url
-        self._client = RuntimeClient.host_session(*self._args, base_url=base_url)
+        self._parent_key = parent_key
+        self._on_open = on_open
+        if resume:
+            self._client = RuntimeClient(base_url=base_url, token=host_token).for_run(resume["run_id"], resume["run_token"])
+            self._client.session = resume
+        else:
+            self._open()
+
+    def _open(self):
+        parent = self._parent_key() if callable(self._parent_key) else self._parent_key
+        self._client = RuntimeClient.host_session(*self._args, base_url=self._base_url, parent_key=parent)
+        if self._on_open:
+            self._on_open(self._client.session)
 
     @property
     def session(self) -> dict:
         return self._client.session
 
     def _reopen(self):
-        self._client = RuntimeClient.host_session(*self._args, base_url=self._base_url)
+        self._open()
 
     def __getattr__(self, name):
         target = getattr(self._client, name)

@@ -5,33 +5,53 @@ import pytest
 from mirage_mcp.sdk import RuntimeClient
 
 
-class Response:
-    status = 200
-    def __enter__(self):
-        return self
-    def __exit__(self, *args):
-        return None
-    def read(self, size):
-        return b'{"ok":true}'
+class Wire:
+    """Stands in for the loopback socket: records what the SDK sends, answers with a fixed JSON body."""
 
-
-class Opener:
     def __init__(self):
-        self.requests = []
-    def open(self, request, timeout):
-        self.requests.append(request)
-        return Response()
+        self.sent = []
+
+    def __call__(self, address, timeout):
+        wire = self
+
+        class Connection:
+            replied = False
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
+            def sendall(self, data):
+                wire.sent.append(data)
+
+            def recv(self, size):
+                if self.replied:
+                    return b""
+                self.replied = True
+                return b"HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n\r\n{\"ok\":true}"
+
+        return Connection()
+
+    def request(self, index=0):
+        head, _, body = self.sent[index].partition(b"\r\n\r\n")
+        lines = head.decode().split("\r\n")
+        headers = dict(line.split(": ", 1) for line in lines[1:])
+        return lines[0], headers, body
 
 
-def test_scoped_sdk_never_keeps_or_sends_owner_token():
+def test_scoped_sdk_never_keeps_or_sends_owner_token(monkeypatch):
+    wire = Wire()
+    monkeypatch.setattr("mirage_mcp.sdk.socket.create_connection", wire)
     owner = RuntimeClient(token="owner-secret")
-    owner._opener = Opener()
     scoped = owner.for_run("run-1", "scoped-secret")
     scoped.evaluate("github", "read", {}, "read-1")
-    request = scoped._opener.requests[0]
-    assert request.get_header("Authorization") == "Bearer scoped-secret"
-    assert json.loads(request.data)["run_id"] == "run-1"
-    assert b"owner-secret" not in request.data
+    line, headers, body = wire.request()
+    assert line.startswith("POST /api/v1/runtime/evaluate ")
+    assert headers["Authorization"] == "Bearer scoped-secret"
+    assert json.loads(body)["run_id"] == "run-1"
+    assert b"owner-secret" not in wire.sent[0]
     assert "owner-secret" not in repr(vars(scoped))
     for action in (lambda: scoped.create_run("Other"), lambda: scoped.list_tools(), lambda: scoped.classify_tool("s", "t", "hash", "SOURCE_TRUSTED"), lambda: scoped.resolve_approval("a", "APPROVED")):
         with pytest.raises(ValueError):
@@ -52,11 +72,13 @@ def test_sdk_is_loopback_only_and_rejects_credential_urls(url):
         RuntimeClient(url, token="owner-secret")
 
 
-def test_sdk_token_file_and_operator_route(tmp_path):
+def test_sdk_token_file_and_operator_route(tmp_path, monkeypatch):
+    wire = Wire()
+    monkeypatch.setattr("mirage_mcp.sdk.socket.create_connection", wire)
     token_file = tmp_path / "control-plane.token"
     token_file.write_text("operator-secret\n")
     client = RuntimeClient(token_file=token_file)
-    client._opener = Opener()
     client.list_tools()
-    assert client._opener.requests[0].full_url.endswith("/api/v1/tools")
-    assert client._opener.requests[0].get_header("Authorization") == "Bearer operator-secret"
+    line, headers, _ = wire.request()
+    assert line.startswith("GET /api/v1/tools ")
+    assert headers["Authorization"] == "Bearer operator-secret"

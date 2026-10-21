@@ -57,3 +57,7 @@
 .governance-technical { display: grid; gap: 14px; }
 .governance-technical summary { cursor: pointer; color: var(--text-2); font-size: 12.5px; }
 .governance-technical[open] summary { margin-bottom: 10px; }
+.governance-sources { display: grid; gap: 10px; }
+.governance-sources ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
+.governance-sources blockquote { margin: 6px 0 0; padding: 6px 10px; border-left: 2px solid var(--red-border); color: var(--text-2); font-size: 12px; background: var(--red-soft); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; overflow-wrap: anywhere; }
+.governance-trust { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }

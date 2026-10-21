@@ -304,7 +304,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="elytra",
         description="Elytra: local guardrails for coding agents. Start with `elytra setup`.",
     )
-    sub = parser.add_subparsers(dest="command", required=True, metavar="<command>")
+    from mirage_mcp import __version__
+    parser.add_argument("--version", action="version", version=f"elytra {__version__}")
+    sub =parser.add_subparsers(dest="command", required=True, metavar="<command>")
     # Everyday commands first; setup registers setup, uninstall, status, service and open.
     from mirage_mcp.cli import setup as setup_cli
     setup_cli.register(sub)
@@ -325,6 +327,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_unlink.add_argument('--gateway', default='http://127.0.0.1:8765')
     p_unlink.add_argument('--token-file', default=str(Path.home()/'.elytra/control-plane.token'))
     p_unlink.set_defaults(func=cloud_cli.unlink)
+    from mirage_mcp.cli import devtools
+    devtools.register(sub)
 
     p_up = sub.add_parser("up", help="Run the runtime in the foreground (setup runs it in the background)")
     p_up.add_argument("--host", default="127.0.0.1", help="Bind host address")

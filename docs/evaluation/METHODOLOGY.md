@@ -24,6 +24,10 @@ Protected cases cover missing permission, exact grants, changed arguments, unkno
 
 End-to-end timing includes local runtime dispatch and mock subprocess I/O. It excludes human approval wait and real provider latency. Report arm distributions and paired differences, payload sizes, warm-up count, sample count, and environment. A small local fixture set cannot establish service latency under load.
 
+## Agent decision benchmarks (0.5.0a1)
+
+`python -m benchmarks.classifier`, `python -m benchmarks.sessions` and `python -m benchmarks.hook_latency` measure the agent hooks: labeled shell commands, replayed agent sessions through the real hook handler and runtime, and hook wall-clock latency. They are scripted replays, not agent compromise measurements. Results, held-out first-contact scores and limitations are in `docs/evaluation/DECISIONS.md`.
+
 ## Evidence needed before protection claims
 
 An agent-driven evaluation requires a pinned model/provider version, prompts, source content, tool schemas, agent/tool permissions, runtime policy, seeds where available, initial state, terminal effects, and complete redacted transcripts. Run the identical task in protected and bypass modes with fresh isolated state. Separate attack completion, legitimate task completion, interruption count, and evaluator uncertainty. Record unknown results explicitly. Provider credentials and customer authorization are not present in this repository; no such outcomes are claimed.

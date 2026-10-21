@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0a1 · Unreleased
+
+Fewer prompts and more attacks stopped, measured in `docs/evaluation/DECISIONS.md`: on replayed agent sessions, Balanced interrupts 0.0 times per 100 everyday tool calls (24.7 in 0.4.0a3) and stops all 14 attack sessions (6 blocked outright, 5 before). Hooks answer in 38 ms at the median (116 ms before).
+
+- Richer agent actions: routine checks, package installs, downloaded code (`curl | sh`, process substitution, base64 into a shell), sensitive files (shell startup, credentials, git hooks, CI, outside the project), secret reads and sends, pushes to working vs protected branches, PR create vs merge, history rewrites. Wrappers and inline scripts (`sudo`, `env`, `bash -c`, `python -c`, `node -e`) are classified by what they run.
+- Taint levels per source: reasons name what the session read ("This session read github.com/acme/api/issues/7, so sending data out is blocked."). Reading secrets makes later sends, pushes and new PRs ask in every preset; sending secret files is always blocked.
+- Content inspection: what a read returns is checked for instructions aimed at AI agents, hidden text and dangerous commands. A finding makes every change in that session ask and sends a desktop notification; clean, inspected content lets local edits run in Balanced.
+- Sessions follow the agent's conversation, so a new conversation or `/clear` starts clean. "Trust this session again" in the console and `elytra trust-session` reset one.
+- Official documentation sites count as trusted unless inspection flags them; edit the list with `elytra trust-domain`.
+- `elytra explain "<command>"` shows how a command is classified and decided in each session state. `elytra doctor` checks the service, hooks per agent, MCP protection, hook latency and the phone link.
+- Upgrades refresh Elytra's built-in actions and preset rules on start without touching your own rules.
+- Deletes and history rewrites say what they do ("It deletes files, so it needs your OK."). `elytra --version` prints the version. Setup points to `elytra doctor`.
+
 ## 0.4.0a3 · Unreleased
 
 Found by installing from PyPI and using Elytra the way a new user would.

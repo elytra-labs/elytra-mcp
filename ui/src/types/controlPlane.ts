@@ -89,6 +89,8 @@ export interface StepUpApproval {
   execution_status?: string;
   arguments_hash?: string;
   agent?: string;
+  taint_level?: 'CLEAN' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  source_evidence?: Record<string, string[]>;
 }
 
 export interface PolicyRule {

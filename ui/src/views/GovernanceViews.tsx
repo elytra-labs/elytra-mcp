@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ArrowUpRight, Check, CheckCheck, Fingerprint, Plus, Search, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
 import { Badge, Card, Chain, Code, Empty, PageHeader, Segmented, Select, Sheet, SkeletonRows, Switch } from '../components/ui';
 import { ACTION_META, fullDate, humanize, PIN_META, prettyJson, shortHash, timeAgo, toolLabel } from '../lib/format';
+import { api } from '../lib/api';
 import { useStore } from '../lib/store';
 import type { PolicyRule, SchemaPinRecord, StepUpApproval } from '../types/controlPlane';
 import '../styles/governance.css';
@@ -103,11 +104,50 @@ export function ApprovalsView() {
   );
 }
 
+const TAINT_LABEL: Record<string, string> = {
+  CRITICAL: 'Looks like instructions aimed at AI agents', HIGH: 'Untrusted, and Elytra could not inspect it', MEDIUM: 'Untrusted, inspected and looked clean',
+};
+
+function sourceName(name: string) {
+  const [kind, ...rest] = name.split(':');
+  const detail = rest.join(':');
+  if (!detail) return `${name} (MCP tool result)`;
+  return kind === 'web' ? detail : kind === 'file' ? `${detail} (local file)` : detail;
+}
+
+function SessionSources({ approval }: { approval: StepUpApproval }) {
+  const { toast } = useStore();
+  const [busy, setBusy] = useState(false);
+  const [trusted, setTrusted] = useState(false);
+  const sources = approval.taint_lineage || [];
+  if (!sources.length) return null;
+  const evidence = approval.source_evidence || {};
+  async function trust() {
+    setBusy(true);
+    try {
+      const result = await api.trustSession(approval.session_id);
+      setTrusted(true);
+      toast(`Session trusted again (${result.cleared.length} source${result.cleared.length === 1 ? '' : 's'} cleared)`, 'green');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not update the session', 'red');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return <section className="governance-sources">
+    <h3 className="section-title">What this session read</h3>
+    {approval.taint_level && TAINT_LABEL[approval.taint_level] && <Badge tone={approval.taint_level === 'CRITICAL' ? 'red' : 'amber'} dot>{TAINT_LABEL[approval.taint_level]}</Badge>}
+    <ul>{sources.map((name) => <li key={name}><span className="mono">{sourceName(name)}</span>{(evidence[name] || []).map((snippet, index) => <blockquote key={index}>{snippet}</blockquote>)}</li>)}</ul>
+    {approval.status === 'PENDING' && !trusted && <div className="governance-trust"><button className="btn ghost sm" disabled={busy} onClick={() => void trust()}>Trust this session again</button><span className="subtle">After you have checked what it read. This decision still needs your answer.</span></div>}
+  </section>;
+}
+
 function ApprovalDetails({ approval, now }: { approval: StepUpApproval; now: number }) {
   return <div className="governance-detail-stack">
     <div className="governance-detail-status"><Badge tone={approvalTone[approval.status]} dot>{humanize(approval.status)}</Badge><span className="subtle">Requested {timeAgo(approval.created_at)}</span>{approval.status === 'PENDING' && <ExpiryLabel expiresAt={approval.expires_at} now={now} />}</div>
     <Code copy={false}>{actionText(approval)}</Code>
     <section><h3 className="section-title">Why Elytra held it</h3><p className="governance-reason">{approval.reason || 'This action matched a rule that asks you first.'}</p></section>
+    <SessionSources approval={approval} />
     <section><h3 className="section-title">Arguments</h3><Code json>{prettyJson(approval.arguments_preview)}</Code><p className="field-hint">Secrets are redacted. If something looks unexpected, deny it.</p></section>
     <details className="governance-technical"><summary>Technical details</summary><dl className="meta"><dt>Server</dt><dd>{approval.server_id}</dd><dt>Policy</dt><dd className="mono">{approval.rule_id}</dd><dt>Rule score</dt><dd>{approval.risk_score} / 100</dd><dt>Requested</dt><dd>{fullDate(approval.created_at)}</dd><dt>Session</dt><dd className="mono governance-break">{approval.session_id}</dd>{approval.call_id && <><dt>Call ID</dt><dd className="mono governance-break">{approval.call_id}</dd></>}{approval.expires_at && <><dt>Expires</dt><dd>{fullDate(approval.expires_at)}</dd></>}{approval.execution_status && <><dt>Execution status</dt><dd>{humanize(approval.execution_status)}</dd></>}<dt>Request ID</dt><dd className="mono governance-break">{approval.approval_id}</dd>{approval.resolved_at && <><dt>Resolved</dt><dd>{fullDate(approval.resolved_at)}</dd></>}{approval.resolved_by && <><dt>Resolved by</dt><dd>{approval.resolved_by}</dd></>}</dl>
     <section><h3 className="section-title">Source lineage</h3>{approval.taint_lineage.length ? <Chain nodes={approval.taint_lineage[approval.taint_lineage.length - 1] === approval.tool_name ? approval.taint_lineage : [...approval.taint_lineage, toolLabel(approval.tool_name, approval.server_id)]} heldLast={approval.status === 'PENDING'} /> : <p className="subtle">No source lineage was recorded.</p>}</section>

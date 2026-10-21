@@ -646,25 +646,32 @@ elytra uninstall # restore every agent configuration`}</Code>
             MCP servers get suggested classifications; anything unlisted or changed waits for your review.
           </p>
           <dl>
-            <dt>Reads</dt>
-            <dd>Reading files, searching, git status and diff. Always run.</dd>
-            <dt>Untrusted web reads</dt>
-            <dd>Fetching pages, issues and pull requests. Run, and mark the session as untrusted.</dd>
-            <dt>Edits and unrecognized commands</dt>
-            <dd>File edits, commits, builds, scripts. Treated as writes.</dd>
-            <dt>Sends</dt>
-            <dd>git push, POST requests, comments, publishing, uploads.</dd>
-            <dt>Deletes and history rewrites</dt>
-            <dd>rm -r, DROP TABLE, force push, hard reset, git clean. Always need a decision.</dd>
+            <dt>Reads and checks</dt>
+            <dd>Reading files, searching, git status and diff, tests, builds and linters. Run.</dd>
+            <dt>Untrusted reads</dt>
+            <dd>Pages, issues, pull requests and connector results. Run, are inspected for instructions aimed at AI agents, and mark the session. Official documentation sites count as trusted.</dd>
+            <dt>Secrets</dt>
+            <dd>.env files, keys and cloud credentials. Reading them makes later sends, pushes and new pull requests ask. Sending them is blocked.</dd>
+            <dt>Changes</dt>
+            <dd>Edits, commits, installs and unrecognized commands. Shell startup files, git hooks, CI and files outside the project always ask.</dd>
+            <dt>Pushes and sends</dt>
+            <dd>Pushes to working branches, pull requests, POST requests, publishing, uploads. Protected branches and merges ask.</dd>
+            <dt>Deletes, history rewrites and downloaded code</dt>
+            <dd>rm -r, DROP TABLE, force push, hard reset, curl | sh. Always need a decision.</dd>
           </dl>
           <dl>
             <dt>Balanced (default)</dt>
-            <dd>Reads run. Writes run in a clean session. Writes after the agent reads untrusted content, sends, and deletes or payments ask you. Sending data out after untrusted reads is blocked.</dd>
+            <dd>Reads, tests and builds run. Edits, installs, commits and pushes to working branches run in a clean session. After untrusted content, unrecognized commands and installs ask you, and so do edits unless Elytra inspected that content and found it clean. Sends, protected branches, merges, sensitive files, downloaded scripts and deletes ask you. Sending data out after untrusted reads, or sending secrets, is blocked.</dd>
             <dt>Cautious</dt>
-            <dd>Every write and send asks you.</dd>
+            <dd>Reads run. Every change and send asks you. Sending data out after untrusted reads, or sending secrets, is blocked.</dd>
             <dt>Autonomous</dt>
-            <dd>Only destructive or financial actions ask you. Sending data out after untrusted reads is blocked.</dd>
+            <dd>Agents act freely. Deletes, sensitive files and downloaded scripts ask you. Sending data out after untrusted reads, or sending secrets, is blocked.</dd>
           </dl>
+          <p>
+            In every preset, content that looks like instructions aimed at AI agents makes every change
+            in that session ask. Check your setup with <code>elytra doctor</code>, and see how any
+            command would be decided with <code>elytra explain &quot;git push origin main&quot;</code>.
+          </p>
           <p>
             When an action needs you, Claude Code and Grok show their own prompt with Elytra&apos;s reason.
             Codex and Antigravity, and any agent running with permissions bypassed, wait up to ten
@@ -672,9 +679,11 @@ elytra uninstall # restore every agent configuration`}</Code>
             the console&apos;s Guardrails page.
           </p>
           <div className="doc-note">
-            Coverage is per agent host process, not per conversation. Shell classification is a
-            heuristic, and an agent can still act outside its hooks (for example through a script it
-            writes and runs, which is checked only as an unrecognized command). Read{" "}
+            Agent hooks follow each conversation; wrapped MCP servers are grouped by agent process.
+            Shell classification and content inspection are heuristics: an agent can still act outside
+            its hooks (for example through a script it writes and runs, which is checked only as an
+            unrecognized command), and a page with no injection markers can still steer a local edit
+            in Balanced. Read{" "}
             <a href="/security">what host sessions establish</a>.
           </div>
         </section>

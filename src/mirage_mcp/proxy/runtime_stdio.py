@@ -33,7 +33,7 @@ async def run_runtime_proxy(client, server_id: str, command: list[str], approval
                     requested = params.get("protocolVersion", "2025-11-25")
                     version = requested if requested in {"2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"} else "2025-11-25"
                     result = {"protocolVersion": version, "capabilities": {"tools": {"listChanged": False}},
-                        "serverInfo": {"name": "elytra-explicit-run-proxy", "version": "0.4.0a3"},
+                        "serverInfo": {"name": "elytra-explicit-run-proxy", "version": "0.5.0a1"},
                         "instructions": "Only tools routed through this explicit run are covered. Unclassified tools require local operator review."}
                 elif method == "ping": result = {}
                 elif method == "tools/list": result = await target.list_tools()

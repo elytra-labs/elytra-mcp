@@ -85,10 +85,28 @@ def _identifier(value: Any, label: str) -> str:
     return value
 
 
-def _policy_reason(policy: dict, blocked: bool) -> str:
-    """A reason a person can act on. Guardrail presets explain themselves; an operator's own rule is named."""
+def _source_phrase(name: str) -> str:
+    if ":" not in name:
+        return f"a result from {name}"  # An MCP tool, named server.tool.
+    kind, _, detail = name.partition(":")
+    if kind == "web" and detail:
+        return detail
+    if kind == "mcp" and detail:
+        return f"a result from {detail}"
+    if kind == "file" and detail:
+        return detail
+    return "untrusted content" if not detail else detail
+
+
+def _policy_reason(policy: dict, blocked: bool, taint: dict | None = None) -> str:
+    """A reason a person can act on. Guardrail presets explain themselves and name the source; an operator's own rule is named."""
     if str(policy.get("rule_id", "")).startswith("guardrail.") and policy.get("description"):
-        return str(policy["description"]).rstrip(".")
+        taint = taint or {}
+        untrusted = [n for n in taint.get("ranked", []) if not n.startswith("secret:")]
+        secrets_read = [n.partition(":")[2] for n in taint.get("ranked", []) if n.startswith("secret:")]
+        source = _source_phrase(untrusted[0]) if untrusted else "untrusted content"
+        secret = ", ".join(secrets_read[:2]) or "secrets"
+        return str(policy["description"]).replace("{source}", source).replace("{secret}", secret).rstrip(".")
     name = policy.get("name") or policy.get("rule_id") or "a policy"
     return f'Blocked by your rule "{name}"' if blocked else f'Your rule "{name}" asks you to approve this action'
 
@@ -151,6 +169,7 @@ class RuntimeService:
         self._conn = None
         try:
             self._open_storage(str(db_path))
+            self._refresh_builtins()
         except BaseException:
             self.close()
             raise
@@ -301,6 +320,26 @@ class RuntimeService:
         if run["status"] != "ACTIVE" or run["expires_at_epoch"] <= time.time():
             raise RuntimeAuthorizationError("Run has ended or expired")
         return run
+
+    @_atomic
+    def _refresh_builtins(self):
+        """After an upgrade, bring Elytra's own definitions up to date: built-in agent actions and the chosen preset's rules.
+
+        Only what setup installed is refreshed, and the person's own rules are never touched.
+        """
+        if any(t.get("classified_by") == "elytra-builtin" for t in self._all("tools")):
+            self.install_builtin_actions()
+        state = self._get("meta", "guardrails") or {}
+        preset = state.get("preset")
+        if preset:
+            fields = ("rule_id", "name", "description", "source_pattern", "sink_pattern", "min_taint_level", "action", "categories", "priority")
+            current = sorted(_canonical({k: r.get(k) for k in fields}) for r in self._all("policies") if r["rule_id"].startswith(GUARDRAIL_PREFIX))
+            try:
+                wanted = sorted(_canonical({k: r.get(k) for k in fields}) for r in preset_rules(preset))
+            except ValueError:
+                return
+            if current != wanted:
+                self.apply_guardrail_preset(preset)
 
     def _public_run(self, run: dict) -> dict:
         return {key: value for key, value in run.items() if key not in {"token_hash", "grants"}}
@@ -517,8 +556,41 @@ class RuntimeService:
         self._bump_version("Operator changed schema/classification")
         return record
 
-    def _match_policy(self, run: dict, server_id: str, tool_name: str, level: str, category: str | None = None) -> dict | None:
-        sources = run["untrusted_sources"] or ["*"]
+    def _taint(self, run: dict) -> dict:
+        """The session's effective sources: its own, plus what its parent process read directly (MCP servers have no conversation)."""
+        levels = dict(run.get("source_levels") or {name: "HIGH" for name in run.get("untrusted_sources", [])})
+        parent = self._get("runs", run["parent_run_id"]) if run.get("parent_run_id") else None
+        if parent:
+            origins = parent.get("source_origin") or {}
+            for name, level in (parent.get("source_levels") or {name: "HIGH" for name in parent.get("untrusted_sources", [])}).items():
+                if origins.get(name, "direct") == "direct" and LEVELS[level] > LEVELS.get(levels.get(name, "CLEAN"), 0):
+                    levels[name] = level
+        ranked = sorted(levels, key=lambda n: (-LEVELS[levels[n]], n))
+        level = levels[ranked[0]] if ranked else "CLEAN"
+        return {"level": level, "levels": levels, "ranked": ranked,
+                "evidence": {**((parent or {}).get("source_evidence") or {}), **(run.get("source_evidence") or {})}}
+
+    def _add_source(self, run: dict, name: str, level: str, origin: str = "direct", evidence: list | None = None) -> bool:
+        """Raise (never lower) a source's level on a run. Returns whether anything changed."""
+        levels = run.setdefault("source_levels", {n: "HIGH" for n in run.get("untrusted_sources", [])})
+        origins = run.setdefault("source_origin", {})
+        changed = LEVELS[level] > LEVELS.get(levels.get(name, "CLEAN"), 0)
+        if changed:
+            levels[name] = level
+            if len(levels) > 200:  # Bounded: drop the lowest-level sources first.
+                for stale in sorted(levels, key=lambda n: LEVELS[levels[n]])[: len(levels) - 200]:
+                    levels.pop(stale, None)
+        if name not in run["untrusted_sources"] and not name.startswith("secret:"):
+            run["untrusted_sources"].append(name)
+            run["untrusted_sources"] = run["untrusted_sources"][-200:]
+        origins.setdefault(name, origin)
+        if evidence:
+            run.setdefault("source_evidence", {})[name] = evidence[:3]
+            changed = True
+        return changed
+
+    def _match_policy(self, run: dict, server_id: str, tool_name: str, level: str, category: str | None = None, sources: list | None = None) -> dict | None:
+        sources = sources or run["untrusted_sources"] or ["*"]
         target = server_id + "." + tool_name
         policies = sorted(self._all("policies"), key=lambda p: (p["priority"], p["rule_id"]))
         for policy in policies:
@@ -553,7 +625,15 @@ class RuntimeService:
         return self._decision(call)
 
     @_atomic
-    def evaluate(self, run_id: str, run_token: str, server_id: str, tool_name: str, arguments: dict, call_id: str, notify: bool = True) -> dict:
+    def evaluate(self, run_id: str, run_token: str, server_id: str, tool_name: str, arguments: dict, call_id: str, notify: bool = True, claim: bool = False) -> dict:
+        """Decide one call. With `claim`, an allowed call is also claimed in the same transaction (one round trip for hooks)."""
+        decision = self._evaluate(run_id, run_token, server_id, tool_name, arguments, call_id, notify)
+        if claim and decision["decision"] == "ALLOW":
+            self.claim_execution(run_id, run_token, call_id, decision["permit"], arguments)
+            decision = {**{k: v for k, v in decision.items() if k != "permit"}, "claimed": True}
+        return decision
+
+    def _evaluate(self, run_id: str, run_token: str, server_id: str, tool_name: str, arguments: dict, call_id: str, notify: bool = True) -> dict:
         started = time.perf_counter()
         run = self._run(run_id, run_token)
         if not isinstance(arguments, dict):
@@ -571,11 +651,12 @@ class RuntimeService:
             raise RuntimeValidationError("Run reached the 1000-call limit")
         tool = self._get("tools", self._tool_key(server_id, tool_name))
         category = tool["category"] if tool else "UNKNOWN"
+        taint = self._taint(run)
         call = {"key": key, "call_id": call_id, "run_id": run_id, "server_id": server_id, "tool_name": tool_name,
                 "arguments_hash": arguments_hash, "schema_hash": tool["sha256_hash"] if tool else "", "policy_version": self._version(),
                 "category": category, "created_at": _now(), "created_at_epoch": time.time(), "expires_at_epoch": min(time.time() + run.get("approval_window", EXPLICIT_APPROVAL_WINDOW), run["expires_at_epoch"]),
-                "source_lineage": list(run["untrusted_sources"]), "taint_level": "HIGH" if run["untrusted_sources"] else "CLEAN", "rule_id": None,
-                "notify": bool(notify)}
+                "source_lineage": [n for n in taint["ranked"] if not n.startswith("secret:")][:20], "taint_level": taint["level"], "rule_id": None,
+                "notify": bool(notify), "source_label": self._source_label(server_id, tool_name, category, arguments)}
         reason, status, event_decision = "Tool is unknown; operator classification required", "BLOCKED", "BLOCK_SECOND_HOP"
         if tool and tool["status"] != "VERIFIED":
             reason, event_decision = "Tool schema is not verified: " + tool["status"], "SCHEMA_DRIFT_BLOCK"
@@ -584,17 +665,17 @@ class RuntimeService:
                 reason, status, event_decision = "Operator-classified source read", "READY", "ALLOW"
             else:
                 granted = any(g["server_id"] == server_id and g["tool_name"] == tool_name and g.get("arguments_hash") == arguments_hash for g in run["grants"])
-                policy = self._match_policy(run, server_id, tool_name, call["taint_level"], category)
+                policy = self._match_policy(run, server_id, tool_name, call["taint_level"], category, taint["ranked"] or None)
                 action = policy["action"] if policy else None
                 call["rule_id"] = policy["rule_id"] if policy else None
                 if action == "BLOCK_SECOND_HOP":
-                    reason = _policy_reason(policy, blocked=True)
+                    reason = _policy_reason(policy, True, taint)
                 elif action == "STEP_UP_APPROVAL":
-                    reason, status, event_decision = _policy_reason(policy, blocked=False), "PENDING", "STEP_UP_REQUIRED"
+                    reason, status, event_decision = _policy_reason(policy, False, taint), "PENDING", "STEP_UP_REQUIRED"
                 elif granted or action in {"REDACT_AND_ALLOW", "AUDIT_ONLY"}:
                     reason, status, event_decision = "Explicit operator grant" if granted else "Explicit operator policy", "READY", "ALLOW"
                 else:
-                    reason, status, event_decision = "Untrusted input preceded this action; approval required" if run["untrusted_sources"] else "Consequential action requires explicit authorization", "PENDING", "STEP_UP_REQUIRED"
+                    reason, status, event_decision = "Untrusted input preceded this action; approval required" if taint["level"] not in {"CLEAN", "LOW"} else "Consequential action requires explicit authorization", "PENDING", "STEP_UP_REQUIRED"
         call.update(reason=reason, status=status, eval_latency_ms=round((time.perf_counter() - started) * 1000, 4))
         if status == "PENDING":
             approval_id = "apr_" + uuid.uuid4().hex
@@ -606,7 +687,8 @@ class RuntimeService:
                 preview = {"_preview_truncated": True, "_redacted_json_prefix": preview_text[:12000], "_arguments_sha256": arguments_hash}
             approval = {"approval_id": approval_id, "created_at": call["created_at"], "created_at_epoch": call["created_at_epoch"],
                         "run_id": run_id, "session_id": run_id, "call_id": call_id, "server_id": server_id, "tool_name": tool_name,
-                        "rule_id": call["rule_id"] or "default-approval", "risk_score": 80 if run["untrusted_sources"] else 50,
+                        "rule_id": call["rule_id"] or "default-approval", "risk_score": {"CRITICAL": 95, "HIGH": 80, "MEDIUM": 65}.get(taint["level"], 50),
+                        "taint_level": taint["level"], "source_evidence": {n: taint["evidence"][n] for n in call["source_lineage"] if n in taint["evidence"]},
                         "taint_lineage": call["source_lineage"], "arguments_preview": preview, "reason": reason, "status": "PENDING",
                         "arguments_hash": arguments_hash, "schema_hash": call["schema_hash"], "policy_version": call["policy_version"],
                         "expires_at_epoch": call["expires_at_epoch"], "resolved_at": None, "resolved_by": None, "arguments_preview_truncated": preview_truncated}
@@ -660,21 +742,113 @@ class RuntimeService:
         # Conservatively mark the run before dispatch, even if the read later
         # fails/cancels. This closes evaluate-before-source-completion races.
         if call["category"] == "SOURCE_UNTRUSTED":
-            source = call["server_id"] + "." + call["tool_name"]
-            if source not in run["untrusted_sources"]:
-                run["untrusted_sources"].append(source)
-                self._put("runs", run_id, run)
-            self._invalidate_clean_permits(run_id, except_key=key)
+            source = call.get("source_label") or call["server_id"] + "." + call["tool_name"]
+            self._add_source(run, source, "HIGH")
+            self._put("runs", run_id, run)
+            self._propagate_source(run, source, "HIGH")
+            self._invalidate_lower_permits(run_id, "HIGH", except_key=key)
+        elif call["server_id"] == "agent" and call["tool_name"] == "read_secrets":
+            self._add_source(run, call.get("source_label") or "secret:secrets", "LOW")
+            self._put("runs", run_id, run)
+            self._propagate_source(run, call.get("source_label") or "secret:secrets", "LOW")
         cleaned = self._redact(arguments)
         self._event(call, "ALLOW", secrets_redacted=cleaned.secrets_found)
         return {"run_id": run_id, "call_id": call_id, "status": "CLAIMED", "server_id": call["server_id"], "tool_name": call["tool_name"], "arguments": cleaned.redacted_payload}
 
-    def _invalidate_clean_permits(self, run_id: str, except_key: str):
-        # A source may be claimed between sink evaluation and sink dispatch.
+    def _invalidate_lower_permits(self, run_id: str, level: str, except_key: str | None = None):
+        # A source may be claimed (or found suspicious) between sink evaluation and dispatch.
         # Re-evaluation requires a fresh call_id and sees the current lineage.
         for other in self._all("calls"):
-            if other["run_id"] == run_id and other["key"] != except_key and other["category"] in SINKS and other["status"] in {"READY", "PENDING", "APPROVED"} and other["taint_level"] == "CLEAN":
-                self._cancel(other, "Untrusted source was dispatched after this authorization", status="INVALIDATED")
+            if other["run_id"] == run_id and other["key"] != except_key and other["category"] in SINKS and other["status"] in {"READY", "PENDING", "APPROVED"} \
+                    and LEVELS.get(other.get("taint_level", "CLEAN"), 0) < LEVELS[level]:
+                self._cancel(other, "Untrusted content was read after this authorization", status="INVALIDATED")
+
+    def _invalidate_clean_permits(self, run_id: str, except_key: str):
+        self._invalidate_lower_permits(run_id, "HIGH", except_key)
+
+    def _propagate_source(self, run: dict, name: str, level: str, evidence: list | None = None):
+        """A conversation's reads also count for its parent process, whose MCP servers cannot tell conversations apart."""
+        if not run.get("parent_run_id"):
+            return
+        parent = self._get("runs", run["parent_run_id"])
+        if parent and self._add_source(parent, name, level, origin="conversation", evidence=evidence):
+            self._put("runs", parent["run_id"], parent)
+            self._invalidate_lower_permits(parent["run_id"], level)
+
+    @staticmethod
+    def _source_label(server_id: str, tool_name: str, category: str, arguments: dict) -> str | None:
+        """A bounded, query-free name for what a read brought into the session."""
+        if server_id != "agent":
+            return f"{server_id}.{tool_name}" if category == "SOURCE_UNTRUSTED" else None
+        from mirage_mcp.security.trusted_sources import describe
+        if tool_name in {"web_read", "web_read_trusted"}:
+            target = str(arguments.get("target") or "")
+            if target.startswith(("http://", "https://")):
+                return "web:" + describe(target)
+            command = str(arguments.get("command") or "")
+            urls = re.findall(r"https?://[^\s'\"]+", command)
+            return "web:" + (describe(urls[0]) if urls else " ".join(command.split())[:100] or target[:100] or "the web")
+        if tool_name == "read_secrets":
+            text = str(arguments.get("path") or arguments.get("command") or "")
+            names = re.findall(r"[\w.-]*(?:\.env[\w.]*|id_[a-z0-9]+|credentials|\.netrc|\.npmrc|\.pypirc|secrets?[\w.]*|\.pem|\.key|config\.json)", text)
+            return "secret:" + (names[0] if names else "secrets")[:80]
+        if tool_name in {"read_local"}:
+            path = str(arguments.get("path") or "").split(" ")[0]
+            return "file:" + os.path.basename(path)[:120] if path else None
+        return None
+
+    @_atomic
+    def report_source_scan(self, run_id: str, run_token: str, call_id: str, findings: list) -> dict:
+        """Record what Elytra's content inspection found in a read's result.
+
+        Findings raise the source to CRITICAL (any read, trusted or not). A clean scan lowers only
+        that call's own untrusted source, only from HIGH to MEDIUM, and only once.
+        """
+        run = self._run(run_id, run_token)
+        call = self._get("calls", self._call_key(run_id, _identifier(call_id, "call_id")))
+        if not call or call["status"] not in {"CLAIMED", "COMPLETED"} or not call["category"].startswith("SOURCE_"):
+            raise RuntimeConflictError("Only a read this session dispatched can be scanned")
+        if call.get("scan_reported"):
+            return {"call_id": call_id, "status": "ALREADY_REPORTED"}
+        if not isinstance(findings, list) or len(findings) > 20:
+            raise RuntimeValidationError("Findings must be a list of at most 20 items")
+        evidence = [self._redact(str((f or {}).get("evidence", "") if isinstance(f, dict) else f)[:200]).redacted_payload for f in findings[:3]]
+        name = call.get("source_label") or (f"{call['server_id']}.{call['tool_name']}" if call["server_id"] != "agent" else "file:content")
+        call["scan_reported"] = True
+        call["scan_findings"] = len(findings)
+        self._put("calls", call["key"], call)
+        if findings:
+            self._add_source(run, name, "CRITICAL", evidence=evidence)
+            self._put("runs", run_id, run)
+            self._propagate_source(run, name, "CRITICAL", evidence)
+            self._invalidate_lower_permits(run_id, "CRITICAL")
+            self._event({**call, "reason": f"Possible prompt injection in {_source_phrase(name)}"}, "INJECTION_SUSPECTED")
+            return {"call_id": call_id, "status": "SUSPICIOUS", "taint_level": "CRITICAL", "source": name}
+        levels = run.get("source_levels") or {}
+        if call["category"] == "SOURCE_UNTRUSTED" and levels.get(name) == "HIGH":
+            levels[name] = "MEDIUM"
+            self._put("runs", run_id, run)
+            parent = self._get("runs", run["parent_run_id"]) if run.get("parent_run_id") else None
+            if parent and (parent.get("source_levels") or {}).get(name) == "HIGH" and (parent.get("source_origin") or {}).get(name) == "conversation":
+                parent["source_levels"][name] = "MEDIUM"
+                self._put("runs", parent["run_id"], parent)
+        return {"call_id": call_id, "status": "CLEAN", "taint_level": self._taint(run)["level"]}
+
+    @_atomic
+    def reset_session_trust(self, run_id: str) -> dict:
+        """Owner action: the person reviewed what the session read and trusts it again."""
+        run = self._get("runs", _identifier(run_id, "run_id"))
+        if not run:
+            raise RuntimeValidationError("Unknown session")
+        cleared = list((run.get("source_levels") or {}).keys())
+        for target in [run] + ([self._get("runs", run["parent_run_id"])] if run.get("parent_run_id") else []):
+            if target:
+                target.update(untrusted_sources=[], source_levels={}, source_origin={}, source_evidence={})
+                self._put("runs", target["run_id"], target)
+        self._event({"run_id": run_id, "call_id": "trust-" + uuid.uuid4().hex[:8], "server_id": "elytra", "tool_name": "trust_session",
+                     "category": "SOURCE_TRUSTED", "reason": f"Owner trusted the session again ({len(cleared)} sources cleared)",
+                     "policy_version": self._version(), "schema_hash": "", "status": "COMPLETED", "notify": False}, "SESSION_TRUSTED")
+        return {"run_id": run_id, "cleared": cleared}
 
     @_atomic
     def complete_execution(self, run_id: str, run_token: str, call_id: str, result: Any, is_error=False) -> Any:
@@ -894,9 +1068,7 @@ class RuntimeService:
         # Derived per run, so the service never stores it and every proxy of the session can recompute it.
         return hmac.new(str(host_token).encode(), run_id.encode(), hashlib.sha256).hexdigest()
 
-    @_atomic
-    def open_host_session(self, host_id: str, host_token: str, session_key: str) -> dict:
-        host = self._host(host_id, host_token)
+    def _session_run(self, host: dict, host_id: str, host_token: str, session_key: str, parent_run_id: str | None = None) -> dict:
         if not isinstance(session_key, str) or not re.fullmatch(r"[0-9a-f]{16,64}", session_key):
             raise RuntimeValidationError("Session key must be 16-64 lowercase hex characters")
         mapping_key = "host_session:" + host_id + ":" + session_key
@@ -905,18 +1077,33 @@ class RuntimeService:
         now = time.time()
         if run and run["status"] == "ACTIVE" and run["expires_at_epoch"] > now:
             run["expires_at_epoch"] = max(run["expires_at_epoch"], now + HOST_SESSION_IDLE_SECONDS)
+            if parent_run_id and not run.get("parent_run_id"):
+                run["parent_run_id"] = parent_run_id
             self._put("runs", run["run_id"], run)
-        else:
-            run_id = "run_" + uuid.uuid4().hex
-            token = self._session_token(host_token, run_id)
-            run = {"run_id": run_id, "token_hash": hashlib.sha256(token.encode()).hexdigest(),
-                   "intent": f"{host['label']} session", "grants": [], "status": "ACTIVE",
-                   "created_at": _now(), "created_at_epoch": now, "expires_at_epoch": now + HOST_SESSION_IDLE_SECONDS,
-                   "call_count": 0, "untrusted_sources": [], "coverage": "HOST_SESSION",
-                   "host_id": host_id, "host_label": host["label"], "host_kind": host["kind"],
-                   "approval_window": host["approval_window"]}
-            self._put("runs", run_id, run)
-            self._put("meta", mapping_key, {"run_id": run_id, "created_at": _now()})
+            return run
+        run_id = "run_" + uuid.uuid4().hex
+        token = self._session_token(host_token, run_id)
+        run = {"run_id": run_id, "token_hash": hashlib.sha256(token.encode()).hexdigest(),
+               "intent": f"{host['label']} session", "grants": [], "status": "ACTIVE",
+               "created_at": _now(), "created_at_epoch": now, "expires_at_epoch": now + HOST_SESSION_IDLE_SECONDS,
+               "call_count": 0, "untrusted_sources": [], "source_levels": {}, "source_origin": {}, "coverage": "HOST_SESSION",
+               "host_id": host_id, "host_label": host["label"], "host_kind": host["kind"],
+               "approval_window": host["approval_window"], "parent_run_id": parent_run_id}
+        self._put("runs", run_id, run)
+        self._put("meta", mapping_key, {"run_id": run_id, "created_at": _now()})
+        return run
+
+    @_atomic
+    def open_host_session(self, host_id: str, host_token: str, session_key: str, parent_key: str | None = None) -> dict:
+        """Open or resume a host session. With `parent_key`, the session is one agent conversation inside that
+        host process: it starts clean, and inherits what the process read directly (its MCP servers)."""
+        host = self._host(host_id, host_token)
+        parent = self._session_run(host, host_id, host_token, parent_key) if parent_key and parent_key != session_key else None
+        run = self._session_run(host, host_id, host_token, session_key, parent["run_id"] if parent else None)
+        host_record = self._get("hosts", host_id)
+        if host_record is not None:
+            host_record["last_seen_at"] = _now()
+            self._put("hosts", host_id, host_record)
         return {**self._public_run(run), "run_token": self._session_token(host_token, run["run_id"])}
 
     # Guardrails and catalog ---------------------------------------------------

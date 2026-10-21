@@ -32,11 +32,15 @@ elytra uninstall   # restore every agent configuration exactly
 
 | Preset | Behavior |
 | --- | --- |
-| Balanced (default) | Reads run. Writes run in a clean session. Writes after the agent reads untrusted content, sends, and deletes ask you. Sending data out after untrusted reads is blocked. |
-| Cautious | Every write and send asks you. |
-| Autonomous | Only destructive actions ask you. Sending data out after untrusted reads is blocked. |
+| Balanced (default) | Reads, tests and builds run. Edits, installs, commits and pushes to working branches run in a clean session. After untrusted content, unrecognized commands and installs ask you, and so do edits unless Elytra inspected that content and found it clean. Sends, protected branches, merges, sensitive files, downloaded scripts and deletes ask you. Sending data out after untrusted reads, or sending secrets, is blocked. |
+| Cautious | Reads run. Every change and send asks you. Sending data out after untrusted reads, or sending secrets, is blocked. |
+| Autonomous | Agents act freely. Deletes, sensitive files and downloaded scripts ask you. Sending data out after untrusted reads, or sending secrets, is blocked. |
 
-Agent actions are classified as reads, untrusted web reads, edits, unrecognized commands (treated as writes), sends (push, post, publish, upload), and deletes or history rewrites.
+In every preset, content that looks like instructions aimed at AI agents makes every change in that session ask, and after the agent reads secrets, sends, pushes and new pull requests ask.
+
+Agent actions are classified as reads, secret reads, untrusted web reads (official documentation sites count as trusted), tests and builds, edits, package installs, sensitive-file changes, unrecognized commands (treated as changes), pushes to working or protected branches, pull requests, sends, downloaded code, and deletes or history rewrites.
+
+Check a setup with `elytra doctor`. See how any command would be decided with `elytra explain "git push origin main"`.
 
 When an action needs you, Claude Code and Grok show their own prompt with Elytra's reason. Codex, Antigravity, and any agent running with permissions bypassed wait up to ten minutes while Elytra sends a desktop notification; an action nobody approves is denied.
 
@@ -53,9 +57,10 @@ Held actions then appear in your dashboard at https://elytra-labs.vercel.app/app
 
 ## Limits
 
-- Shell classification is a heuristic. A disguised command, or a script the agent writes and runs, may only be recognized as an unrecognized command, which is treated as a write.
+- Shell classification is a heuristic. A disguised command, or a script the agent writes and runs, may only be recognized as an unrecognized command, which is treated as a change.
 - Self-protection is best-effort. Elytra denies agents reading its credentials or calling its local API, but any process running as you can read your files.
-- Coverage is per agent process, not per conversation.
+- Agent hooks follow each conversation. Wrapped MCP servers cannot tell conversations apart, so what they read counts for every conversation in that agent process.
+- Content inspection is a heuristic. A page with no injection markers can still steer a local edit in Balanced; review diffs before merging, or use Cautious.
 - If the runtime is not running, actions go through with a visible warning, unless you set up with `--fail-closed`.
 - Remote HTTP MCP servers are not proxied; their calls are seen through agent hooks.
 

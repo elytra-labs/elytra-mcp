@@ -47,7 +47,7 @@ class ProtectedMCPClient:
         self._reader_task = asyncio.create_task(self._read())
         try:
             await self._rpc("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
-                "clientInfo": {"name": "elytra-protected-python", "version": "0.4.0a3"}})
+                "clientInfo": {"name": "elytra-protected-python", "version": "0.5.0a1"}})
             await self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
             await self.list_tools()
         except BaseException:
@@ -165,7 +165,13 @@ class ProtectedMCPClient:
             claim = await asyncio.to_thread(self.client.claim, call_id, decision["permit"], arguments)
             claimed = True
             result = await self._rpc("tools/call", {"name": tool_name, "arguments": claim["arguments"]})
-            return await asyncio.to_thread(self.client.complete, call_id, result, bool(isinstance(result, dict) and result.get("isError")))
+            completed = await asyncio.to_thread(self.client.complete, call_id, result, bool(isinstance(result, dict) and result.get("isError")))
+            # Inspect what the tool returned before the agent reads it. Findings raise the session's taint;
+            # the runtime accepts reports only for reads, so a write's result is simply not recorded.
+            with contextlib.suppress(Exception):
+                from mirage_mcp.security.injection_guard import scan
+                await asyncio.to_thread(self.client.report_scan, call_id, scan(result))
+            return completed
         except BaseException as exc:
             if claimed:
                 # Failure after claim is not evidence that an external mutation did not occur.

@@ -34,16 +34,20 @@ elytra uninstall   # restore every agent configuration exactly
                     └──▶ your MCP server (unchanged, keeps its own credentials)
 ```
 
-- **Agent hooks** (`src/mirage_mcp/hooks/`): one short-lived process per tool call. Shell commands, file edits and web access are classified into reads, untrusted web reads, edits, unrecognized commands (treated as writes), sends, and deletes or history rewrites.
+- **Agent hooks** (`src/mirage_mcp/hooks/`): one short-lived process per tool call. Shell commands, file edits and web access are classified into fixed actions (reads, secret reads, untrusted web reads, tests and builds, edits, installs, sensitive files, pushes, pull requests, sends, downloaded code, deletes and history rewrites), and what reads return is inspected for prompt injection.
 - **MCP proxy** (`src/mirage_mcp/proxy/`): wraps local stdio MCP servers. Unknown, changed or suspicious tools wait for your review.
-- **Runtime** (`src/mirage_mcp/runtime/`): a loopback-only service with a SQLite ledger. Each call is decided against your guardrail preset and rules. An allowed call gets a single-use permit bound to its exact arguments. Anything read from outside (an issue, a page, an email) marks the session as untrusted for what follows.
+- **Runtime** (`src/mirage_mcp/runtime/`): a loopback-only service with a SQLite ledger. Each call is decided against your guardrail preset and rules. An allowed call gets a single-use permit bound to its exact arguments. Anything read from outside (an issue, a page, an email) marks the session as untrusted for what follows, at a level set by whether Elytra could inspect it and what it found.
 - **Console** (`ui/`): React app served by the runtime at `http://127.0.0.1:8765/app/`. The same `ui/` builds the public website.
 
 | Preset | Behavior |
 | --- | --- |
-| Balanced (default) | Reads run. Writes run in a clean session. Writes after untrusted content, sends, and deletes ask you. Sending data out after untrusted reads is blocked. |
-| Cautious | Every write and send asks you. |
-| Autonomous | Only destructive actions ask you. Sending data out after untrusted reads is blocked. |
+| Balanced (default) | Reads, tests and builds run. Edits, installs, commits and pushes to working branches run in a clean session. After untrusted content, unrecognized commands and installs ask you, and so do edits unless Elytra inspected that content and found it clean. Sends, protected branches, merges, sensitive files, downloaded scripts and deletes ask you. Sending data out after untrusted reads, or sending secrets, is blocked. |
+| Cautious | Reads run. Every change and send asks you. Sending data out after untrusted reads, or sending secrets, is blocked. |
+| Autonomous | Agents act freely. Deletes, sensitive files and downloaded scripts ask you. Sending data out after untrusted reads, or sending secrets, is blocked. |
+
+In every preset, content that looks like instructions aimed at AI agents makes every change in that session ask, and after the agent reads secrets, sends, pushes and new pull requests ask.
+
+Check a setup with `elytra doctor`. See how any command would be decided with `elytra explain "git push origin main"`.
 
 Claude Code and Grok show their own prompt with Elytra's reason. Codex, Antigravity, and agents running with permissions bypassed wait up to ten minutes while Elytra sends a desktop notification; an action nobody approves is denied.
 
@@ -60,9 +64,10 @@ Held actions then appear in your dashboard at https://elytra-labs.vercel.app/app
 
 ## Limits
 
-- Shell classification is a heuristic. A disguised command, or a script the agent writes and runs, may only be recognized as an unrecognized command, which is treated as a write.
+- Shell classification is a heuristic. A disguised command, or a script the agent writes and runs, may only be recognized as an unrecognized command, which is treated as a change.
 - Self-protection is best-effort. Elytra denies agents reading its credentials or calling its local API, but any process running as you can read your files.
-- Coverage is per agent process, not per conversation.
+- Agent hooks follow each conversation. Wrapped MCP servers cannot tell conversations apart, so what they read counts for every conversation in that agent process.
+- Content inspection is a heuristic. A page with no injection markers can still steer a local edit in Balanced; review diffs before merging, or use Cautious.
 - If the runtime is not running, actions go through with a visible warning, unless you set up with `--fail-closed`.
 
 ## Python integration

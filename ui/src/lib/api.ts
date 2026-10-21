@@ -109,6 +109,7 @@ export const api = {
   revokeHost: (host_id: string) => post<HostRecord>(`/hosts/${encodeURIComponent(host_id)}/revoke`, {}),
   catalog: () => request<CatalogState>('/catalog'),
 
+  trustSession: (runId: string) => post<{ run_id: string; cleared: string[] }>(`/sessions/${encodeURIComponent(runId)}/trust`, {}),
   resolveApproval: (id: string, status: 'APPROVED' | 'DENIED') =>
     post<StepUpApproval>(`/approvals/${encodeURIComponent(id)}/resolve`, { status }),
   togglePolicy: (rule_id: string, enabled: boolean) =>

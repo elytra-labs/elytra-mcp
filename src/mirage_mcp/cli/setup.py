@@ -222,7 +222,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
     restart = list(dict.fromkeys(changed_hosts + [a.label for a in agents if agent_hooks.HookInstaller().installed(a.kind)]))
     if restart:
         _say(f"Restart {', '.join(restart)} to finish. Your agents work as before; Elytra asks you when an action needs a decision.")
-    _say("Open the console any time with `elytra open`. Undo everything with `elytra uninstall`.")
+    _say("Check that protection is live with `elytra doctor`. Open the console with `elytra open`. Undo everything with `elytra uninstall`.")
     from mirage_mcp.cloud.client import DEFAULT_LINK_FILE
     if not DEFAULT_LINK_FILE.exists():
         _say("Away from your desk? `elytra link` lets you approve held actions from your phone with a free account. Optional.")
