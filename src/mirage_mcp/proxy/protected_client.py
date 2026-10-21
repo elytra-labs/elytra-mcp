@@ -47,7 +47,7 @@ class ProtectedMCPClient:
         self._reader_task = asyncio.create_task(self._read())
         try:
             await self._rpc("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
-                "clientInfo": {"name": "elytra-protected-python", "version": "0.4.0a2"}})
+                "clientInfo": {"name": "elytra-protected-python", "version": "0.4.0a3"}})
             await self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
             await self.list_tools()
         except BaseException:

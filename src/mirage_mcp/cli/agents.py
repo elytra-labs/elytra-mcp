@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -64,10 +65,12 @@ def _read_json(path: Path) -> dict:
     return data
 
 
-def _write_json(path: Path, data: dict) -> None:
+def _write_json(path: Path, data: dict, *, ours: bool = False) -> None:
+    """Write a config. A file Elytra owns, or holding only Elytra's entry, needs no backup of the user's original."""
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
-        host_files.backup(path)
+        if not ours and set(_read_json(path)) - {"elytra"}:
+            host_files.backup(path)
         host_files.write(path, data)
     else:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -145,7 +148,7 @@ class HookInstaller:
             return "Restart Claude Code to load the hooks."
         if kind == "grok":
             # Grok also reads ~/.claude/settings.json; identical handlers are deduplicated.
-            _write_json(self.grok_hooks, {"hooks": _claude_blocks(timeout)})
+            _write_json(self.grok_hooks, {"hooks": _claude_blocks(timeout)}, ours=True)
             return "Restart Grok, then run /hooks to confirm Elytra's hooks loaded."
         if kind == "antigravity":
             data = _read_json(self.antigravity_hooks)
@@ -178,7 +181,10 @@ class HookInstaller:
         if kind == "antigravity":
             data = _read_json(self.antigravity_hooks) if self.antigravity_hooks.exists() else {}
             if data.pop("elytra", None) is not None:
-                host_files.write(self.antigravity_hooks, data)
+                if data:
+                    host_files.write(self.antigravity_hooks, data)
+                else:
+                    self.antigravity_hooks.unlink()  # Setup created it; an empty file and no file behave the same.
                 return True
             return False
         if kind == "codex":
@@ -251,8 +257,8 @@ def read_index(home: Path | None = None) -> dict:
         return {}
 
 
-def save_credential(kind: str, credential: dict, *, approval_window: int, fail_closed: bool, gateway: str,
-                    wrapped_servers: list[str], home: Path | None = None) -> None:
+def save_token(credential: dict, home: Path | None = None) -> None:
+    """Keep a host credential in ~/.elytra/hosts (0600). Hooks and the MCP proxy read it there, never from agent config."""
     folder = hosts_dir(home)
     folder.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(folder, 0o700)
@@ -261,6 +267,21 @@ def save_credential(kind: str, credential: dict, *, approval_window: int, fail_c
         fd = os.open(token_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as stream:
             stream.write(credential["host_token"] + "\n")
+
+
+def load_token(host_id: str, home: Path | None = None) -> str | None:
+    if not re.fullmatch(r"host_[A-Za-z0-9]{1,64}", host_id or ""):
+        return None
+    try:
+        return (hosts_dir(home) / f"{host_id}.token").read_text().strip() or None
+    except OSError:
+        return None
+
+
+def save_credential(kind: str, credential: dict, *, approval_window: int, fail_closed: bool, gateway: str,
+                    wrapped_servers: list[str], home: Path | None = None) -> None:
+    folder = hosts_dir(home)
+    save_token(credential, home)
     index = read_index(home)
     index[kind] = {"host_id": credential["host_id"], "approval_window": approval_window, "fail_closed": fail_closed,
                    "gateway": gateway, "wrapped_servers": sorted(set(wrapped_servers))}
@@ -325,7 +346,7 @@ def wrap_cli_server(kind: str, server: dict, host_id: str, host_token: str, gate
     if MARK.replace(".hooks", ".cli.main") in " ".join(map(str, server.get("args", []))):
         return "already protected"
     launcher, prefix = host_files.proxy_launch(server["name"], host_id, gateway)
-    env = {**(server.get("env") or {}), "ELYTRA_HOST_TOKEN": host_token}
+    env = dict(server.get("env") or {})  # The proxy reads its credential from ~/.elytra/hosts, not from agent config.
     env_flags = [flag for key, value in env.items() for flag in ("--env" if kind == "codex" else "-e", f"{key}={value}")]
     if kind == "codex":
         runner(["codex", "mcp", "remove", server["name"]])

@@ -24,13 +24,13 @@ def _rule(rule_id, name, description, action, categories, min_taint="CLEAN", pat
 
 def _block_exfiltration():
     return _rule("block-send-after-untrusted", "Block sending data out after untrusted reads",
-                 "A run that read untrusted content cannot send data to an external destination.",
+                 "This session read untrusted content (a web page, issue or message), so sending data out is blocked.",
                  "BLOCK_SECOND_HOP", [SEND], min_taint="HIGH", priority=1000)
 
 
 def _destructive(action="STEP_UP_APPROVAL"):
     return [_rule(f"destructive-{index}", "Ask before destructive or financial actions",
-                  f"Tools matching {pattern} always need an exact-call decision.", action, [WRITE, SEND],
+                  "Destructive and financial actions always need your OK.", action, [WRITE, SEND],
                   pattern=pattern, priority=1010 + index)
             for index, pattern in enumerate(DESTRUCTIVE)]
 
@@ -43,8 +43,8 @@ PRESETS: dict[str, dict] = {
             _block_exfiltration(),
             *_destructive(),
             _rule("ask-write-after-untrusted", "Ask before writes after untrusted reads",
-                  "Writes need a decision once the run has read untrusted content.", "STEP_UP_APPROVAL", [WRITE], min_taint="HIGH", priority=1100),
-            _rule("ask-send", "Ask before sending data out", "Sends to external destinations need a decision.", "STEP_UP_APPROVAL", [SEND], priority=1200),
+                  "This session read untrusted content, so changes need your OK.", "STEP_UP_APPROVAL", [WRITE], min_taint="HIGH", priority=1100),
+            _rule("ask-send", "Ask before sending data out", "Sending data out needs your OK.", "STEP_UP_APPROVAL", [SEND], priority=1200),
             _rule("allow-write-clean", "Allow and log writes in a clean session", "Writes run without a prompt while the run has read no untrusted content.", "AUDIT_ONLY", [WRITE], priority=1300),
         ],
         "matrix": {"reads": ["allow", "allow"], "writes": ["allow", "ask"], "sends": ["ask", "block"], "destructive": ["ask", "ask"]},
@@ -54,7 +54,7 @@ PRESETS: dict[str, dict] = {
         "summary": "Reads run. Every write and send asks you. Sending data out after untrusted reads is blocked.",
         "rules": lambda: [
             _block_exfiltration(),
-            _rule("ask-all-sinks", "Ask before any write or send", "Every write and send needs an exact-call decision.", "STEP_UP_APPROVAL", [WRITE, SEND], priority=1100),
+            _rule("ask-all-sinks", "Ask before any write or send", "Cautious guardrails ask before every change and send.", "STEP_UP_APPROVAL", [WRITE, SEND], priority=1100),
         ],
         "matrix": {"reads": ["allow", "allow"], "writes": ["ask", "ask"], "sends": ["ask", "block"], "destructive": ["ask", "ask"]},
     },

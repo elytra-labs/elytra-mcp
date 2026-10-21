@@ -100,9 +100,16 @@ def cmd_setup(args: argparse.Namespace) -> int:
     for config in found:
         for server in config.servers:
             host_id = server.entry.get(host_configs.HOST_MARK)
-            token = (server.entry.get("env") or {}).get("ELYTRA_HOST_TOKEN")
+            token = (server.entry.get("env") or {}).get("ELYTRA_HOST_TOKEN") or agent_hooks.load_token(host_id or "")
             if server.wrapped and host_id and token and config.spec.kind not in credentials:
                 credentials[config.spec.kind] = {"host_id": host_id, "host_token": token}
+            if server.wrapped and host_id and token and "ELYTRA_HOST_TOKEN" in (server.entry.get("env") or {}):
+                # Earlier versions kept the credential in agent config, where the agent can read it. Move it.
+                agent_hooks.save_token({"host_id": host_id, "host_token": token})
+                del server.entry["env"]["ELYTRA_HOST_TOKEN"]
+                if not server.entry["env"]:
+                    del server.entry["env"]
+                host_configs.write(config.path, config.data)
     # A credential revoked in the console cannot open sessions: rewrap those servers with a new one.
     active = {h["host_id"] for h in client.hosts()["hosts"] if not h.get("revoked_at")}
     for kind, credential in list(credentials.items()):
@@ -117,6 +124,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
     def credential_for(kind: str) -> dict:
         if kind not in credentials:
             credentials[kind] = client.create_host(labels.get(kind, kind), kind, args.approval_window)
+        agent_hooks.save_token(credentials[kind])
         return credentials[kind]
 
     recognized: dict[str, str] = {}
@@ -318,7 +326,7 @@ def cmd_open(args: argparse.Namespace) -> int:
 
 
 def register(sub) -> None:
-    p = sub.add_parser("setup", help="Protect your agent's MCP tools with local guardrails (guided)")
+    p = sub.add_parser("setup", help="Start here: protect your coding agents (guided, asks before each change)")
     p.add_argument("--yes", action="store_true", help="Accept defaults without prompting")
     p.add_argument("--preset", choices=sorted(PRESETS), help="Guardrail preset (default: balanced)")
     p.add_argument("--hosts", help="Comma-separated agents to configure: claude-code,codex,grok,antigravity,cursor,claude-desktop,windsurf,vscode")
@@ -330,12 +338,12 @@ def register(sub) -> None:
     p.add_argument("--gateway", default=GATEWAY)
     p.set_defaults(func=cmd_setup)
 
-    p = sub.add_parser("uninstall", help="Restore agent configurations, revoke host credentials, remove the service")
+    p = sub.add_parser("uninstall", help="Undo setup: restore every agent configuration and remove the service")
     p.add_argument("--keep-service", action="store_true")
     p.add_argument("--gateway", default=GATEWAY)
     p.set_defaults(func=cmd_uninstall)
 
-    p = sub.add_parser("status", help="Show runtime, protected hosts, and guardrails")
+    p = sub.add_parser("status", help="Show what is protected, the guardrails, and the account link")
     p.add_argument("--gateway", default=GATEWAY)
     p.set_defaults(func=cmd_status)
 

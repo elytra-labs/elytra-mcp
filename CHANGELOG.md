@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.4.0a2 · Unreleased
+## 0.4.0a3 · Unreleased
+
+Found by installing from PyPI and using Elytra the way a new user would.
+
+- Held and blocked actions explain themselves in plain language and name the actual command or file, for example "Elytra blocked `git push origin main`. This session read untrusted content (a web page, issue or message), so sending data out is blocked." Guardrail reasons no longer say "operator policy". Your own rules are named.
+- The console's Approvals page leads with who is asking and what they want to run ("Codex · `git push --force origin main`") and why it was held. Session, call and policy identifiers move under Technical details.
+- The MCP proxy reads its host credential from `~/.elytra/hosts` (owner-only) instead of the agent's own configuration file, where the agent could read it. Running `elytra setup` again moves the credential out of configurations written by earlier versions.
+- `elytra --help` lists everyday commands first and describes them plainly. `elytra uninstall` no longer leaves an empty Antigravity hooks file behind.
+- The sign-in page says what happens next when you arrive from `elytra link` or an invitation.
+
+## 0.4.0a2 · 2026-10-19
 
 - Approve from your phone. `elytra link` links this machine to a free account (GitHub or Google sign-in); held actions then appear in the hosted dashboard, ready to approve or deny from any device. The local runtime, its database, guardrails and hooks stay authoritative: the link uploads redacted summaries of pending approvals only, never tool results or credentials, and applies a decision only when its Ed25519 signature, device, account, expiry and exact binding (run, call, tool, arguments digest, schema and policy version) all match a still-pending action. The first decision wins, a lost link never allows anything, and an unusable link never stops local protection from starting. `elytra unlink` stops it; `elytra status` and the console's Guardrails page show it. Team-managed mode (`elytra login`) is unchanged.
 - New interface palette. The green tint is gone: neutrals are neutral, allowed actions are quiet, and color marks only what needs a person (amber for held, red for blocked). Every text color passes measured contrast targets, decorative greys are no longer used for content, corner radii follow one scale, and all native dropdowns are replaced with a themed, keyboard-accessible control.

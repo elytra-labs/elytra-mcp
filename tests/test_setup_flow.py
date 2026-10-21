@@ -86,7 +86,8 @@ def test_discover_wrap_and_unwrap_round_trip(tmp_path):
     github = data["mcpServers"]["github"]
     assert github["command"] == sys.executable
     assert github["args"][-3:] == ["npx", "-y", "@modelcontextprotocol/server-github"]
-    assert github["env"] == {"GITHUB_TOKEN": "ghp_test", "ELYTRA_HOST_TOKEN": "secret-token"}
+    assert github["env"] == {"GITHUB_TOKEN": "ghp_test"}
+    assert "secret-token" not in claude.path.read_text(), "the agent can read its own config; the host credential never goes there"
     assert data["mcpServers"]["remote"] == original_claude["mcpServers"]["remote"]
     assert data["numStartups"] == 12
     assert (claude.path.parent / ".claude.json.elytra.bak").exists()
@@ -132,7 +133,10 @@ def test_host_mode_session_held_write_notifies_and_dispatches_once(tmp_path):
     endpoint = tmp_path / "endpoint.py"
     endpoint.write_text(ENDPOINT)
     ledger = tmp_path / "calls.db"
-    environment = {**os.environ, "ELYTRA_HOST_TOKEN": credential["host_token"],
+    # The proxy reads its host credential from ~/.elytra/hosts, as `elytra setup` leaves it.
+    from mirage_mcp.cli import agents as agent_files
+    agent_files.save_token(credential, home=tmp_path)
+    environment = {**{k: v for k, v in os.environ.items() if k != "ELYTRA_HOST_TOKEN"}, "HOME": str(tmp_path),
                    "PYTHONPATH": os.pathsep.join([str(REPO / "src"), str(REPO)])}
 
     # The host credential cannot classify tools or approve calls.

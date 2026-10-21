@@ -54,3 +54,6 @@
   .governance-search { width: 100%; }
   .governance-page .table { min-width: 640px; }
 }
+.governance-technical { display: grid; gap: 14px; }
+.governance-technical summary { cursor: pointer; color: var(--text-2); font-size: 12.5px; }
+.governance-technical[open] summary { margin-bottom: 10px; }

@@ -88,6 +88,7 @@ export interface StepUpApproval {
   expires_at?: string;
   execution_status?: string;
   arguments_hash?: string;
+  agent?: string;
 }
 
 export interface PolicyRule {

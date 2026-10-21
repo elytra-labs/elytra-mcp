@@ -248,12 +248,16 @@ def cmd_proxy(args: argparse.Namespace) -> int:
     from mirage_mcp.proxy.runtime_stdio import run_runtime_proxy
     command = list(args.target)
     if command and command[0] == "--": command.pop(0)
-    host_id, host_token = args.host_id or os.environ.get("ELYTRA_HOST_ID"), os.environ.get("ELYTRA_HOST_TOKEN")
+    host_id = args.host_id or os.environ.get("ELYTRA_HOST_ID")
+    host_token = os.environ.pop("ELYTRA_HOST_TOKEN", None)  # Older configs; never passed on to the MCP server.
+    if host_id and not host_token:
+        from mirage_mcp.cli.agents import load_token
+        host_token = load_token(host_id)
     if host_id or host_token:
         # Host mode: an agent host (for example Claude Code) launched this server.
         from mirage_mcp.proxy.host_session import HostSessionClient, host_session_key
         if not command or not host_id or not host_token:
-            print("Host mode requires --host-id, ELYTRA_HOST_TOKEN, and an MCP command after --. Run elytra setup.", file=sys.stderr)
+            print("Host mode requires --host-id with its credential in ~/.elytra/hosts, and an MCP command after --. Run elytra setup.", file=sys.stderr)
             return 2
         client = HostSessionClient(host_id, host_token, host_session_key(), args.gateway)
         window = float(client.session.get("approval_window", 120))
@@ -298,81 +302,14 @@ def cmd_bench(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="elytra",
-        description="Elytra: local, explicit-run MCP execution controls",
+        description="Elytra: local guardrails for coding agents. Start with `elytra setup`.",
     )
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    p_up = sub.add_parser("up", help="Start Control Plane API + React console server")
-    p_up.add_argument("--host", default="127.0.0.1", help="Bind host address")
-    p_up.add_argument("--port", type=int, default=8765, help="Bind port")
-    p_up.add_argument("--db", default=None, help="Path to SQLite WAL database")
-    p_up.add_argument("--open", action="store_true", help="Open Control Plane UI in browser")
-    p_up.add_argument("--token-file", default=str(Path.home() / ".elytra/control-plane.token"))
-    p_up.add_argument("--dev-origin", default=None, help="Explicit local frontend development origin")
-    p_up.add_argument('--cloud-credential-file', default=str(Path.home() / '.elytra/cloud-device.json'))
-    p_up.add_argument('--link-credential-file', default=str(Path.home() / '.elytra/cloud-link.json'))
-    p_up.set_defaults(func=cmd_up)
-    p_connect = sub.add_parser("connect", help="Pair a local browser with a one-time link")
-    p_connect.add_argument("--gateway", default="http://127.0.0.1:8765")
-    p_connect.add_argument("--token-file", default=None)
-    p_connect.add_argument("--open", action="store_true", help="Open the paired console (default)")
-    p_connect.add_argument("--code", action="store_true", help="Print a one-time code for manual entry")
-    p_connect.set_defaults(func=cmd_connect)
-
-    p_scan = sub.add_parser("scan", help="Scan MCP config and generate blast_radius_graph.json")
-    p_scan.add_argument("--config", help="Path to claude_desktop_config.json or .cursor/mcp.json")
-    p_scan.add_argument("--policy", help="Optional path to mirage.policy.yaml")
-    p_scan.add_argument("--output", default=None, help="Optional secondary JSON snapshot path")
-    p_scan.add_argument(
-        "--json-output", default="blast_radius_graph.json", help="Output JSON graph file path"
-    )
-    p_scan.add_argument("--open", action="store_true", help="Open Control Plane in browser")
-    p_scan.add_argument("--demo", action="store_true", help="Explicitly use an illustrative manifest")
-    p_scan.set_defaults(func=cmd_scan)
-
-    p_wrap = sub.add_parser("wrap", help="Wrap MCP server commands with Mirage runtime proxy")
-    p_wrap.add_argument("--config", help="Path to MCP client configuration JSON")
-    p_wrap.add_argument(
-        "--mode",
-        choices=["strict", "step-up", "audit"],
-        default="strict",
-        help="Runtime enforcement mode",
-    )
-    p_wrap.add_argument("--run-id", default=None, help="One explicit run shared by these tools")
-    p_wrap.add_argument("--gateway", default="http://127.0.0.1:8765")
-    p_wrap.set_defaults(func=cmd_wrap)
-
-    p_unwrap = sub.add_parser("unwrap", help="Restore original unwrapped MCP client configuration")
-    p_unwrap.add_argument("--config", help="Path to MCP client configuration JSON")
-    p_unwrap.set_defaults(func=cmd_unwrap)
-
-    p_proxy = sub.add_parser("proxy", help="Run stdio JSON-RPC 2.0 taint interceptor proxy")
-    p_proxy.add_argument("--server-name", default="mcp", help="Logical MCP server identifier")
-    p_proxy.add_argument(
-        "--mode", choices=["strict", "step-up", "audit"], default="strict", help="Enforcement mode"
-    )
-    p_proxy.add_argument("--user-prompt", default="", help="Optional initial user intent anchor")
-    p_proxy.add_argument("--telemetry-log", help="Optional path to JSONL telemetry output")
-    p_proxy.add_argument("target", nargs=argparse.REMAINDER, help="Target command after `--`")
-    p_proxy.add_argument("--run-id", default=None)
-    p_proxy.add_argument("--host-id", default=None, help="Host-session mode: the agent host credential id (token in ELYTRA_HOST_TOKEN)")
-    p_proxy.add_argument("--gateway", default="http://127.0.0.1:8765")
-    p_proxy.set_defaults(func=cmd_proxy)
-
-    p_bench = sub.add_parser("bench", help="Run second-hop exploit red-team benchmark suite")
-    p_bench.add_argument("--suite", choices=["observed", "top50", "flagship"], default="observed")
-    p_bench.add_argument("--format", choices=["table", "json", "markdown"], default="table")
-    p_bench.add_argument("--output", help="Optional report JSON output path")
-    p_bench.set_defaults(func=cmd_bench)
-
+    sub = parser.add_subparsers(dest="command", required=True, metavar="<command>")
+    # Everyday commands first; setup registers setup, uninstall, status, service and open.
+    from mirage_mcp.cli import setup as setup_cli
+    setup_cli.register(sub)
     from mirage_mcp.cloud import cli as cloud_cli
     from mirage_mcp.cloud.client import DEFAULT_CREDENTIAL_FILE
-    p_login = sub.add_parser('login', help='Enroll this runtime in a hosted workspace')
-    p_login.add_argument('--cloud-url', required=True, help='Your Elytra HTTPS deployment origin')
-    p_login.add_argument('--device-name')
-    p_login.add_argument('--code', action='store_true', help='Print a one-time code for manual enrollment instead of opening a browser')
-    p_login.add_argument('--credential-file', default=str(DEFAULT_CREDENTIAL_FILE))
-    p_login.set_defaults(func=cloud_cli.login)
     from mirage_mcp.cloud.client import DEFAULT_CLOUD_URL, DEFAULT_LINK_FILE
     p_link = sub.add_parser('link', help='Approve held actions from your phone: link this machine to a free account')
     p_link.add_argument('--cloud-url', default=DEFAULT_CLOUD_URL, help='Elytra HTTPS origin (default: %(default)s)')
@@ -388,18 +325,88 @@ def build_parser() -> argparse.ArgumentParser:
     p_unlink.add_argument('--gateway', default='http://127.0.0.1:8765')
     p_unlink.add_argument('--token-file', default=str(Path.home()/'.elytra/control-plane.token'))
     p_unlink.set_defaults(func=cloud_cli.unlink)
-    p_logout = sub.add_parser('logout', help='Remove this machine cloud enrollment')
+
+    p_up = sub.add_parser("up", help="Run the runtime in the foreground (setup runs it in the background)")
+    p_up.add_argument("--host", default="127.0.0.1", help="Bind host address")
+    p_up.add_argument("--port", type=int, default=8765, help="Bind port")
+    p_up.add_argument("--db", default=None, help="Path to SQLite WAL database")
+    p_up.add_argument("--open", action="store_true", help="Open Control Plane UI in browser")
+    p_up.add_argument("--token-file", default=str(Path.home() / ".elytra/control-plane.token"))
+    p_up.add_argument("--dev-origin", default=None, help="Explicit local frontend development origin")
+    p_up.add_argument('--cloud-credential-file', default=str(Path.home() / '.elytra/cloud-device.json'))
+    p_up.add_argument('--link-credential-file', default=str(Path.home() / '.elytra/cloud-link.json'))
+    p_up.set_defaults(func=cmd_up)
+    p_connect = sub.add_parser("connect", help="Pair a browser with the local console using a one-time link")
+    p_connect.add_argument("--gateway", default="http://127.0.0.1:8765")
+    p_connect.add_argument("--token-file", default=None)
+    p_connect.add_argument("--open", action="store_true", help="Open the paired console (default)")
+    p_connect.add_argument("--code", action="store_true", help="Print a one-time code for manual entry")
+    p_connect.set_defaults(func=cmd_connect)
+
+    p_scan = sub.add_parser("scan", help="(advanced) Map the MCP servers in a config and what they can reach")
+    p_scan.add_argument("--config", help="Path to claude_desktop_config.json or .cursor/mcp.json")
+    p_scan.add_argument("--policy", help="Optional path to mirage.policy.yaml")
+    p_scan.add_argument("--output", default=None, help="Optional secondary JSON snapshot path")
+    p_scan.add_argument(
+        "--json-output", default="blast_radius_graph.json", help="Output JSON graph file path"
+    )
+    p_scan.add_argument("--open", action="store_true", help="Open Control Plane in browser")
+    p_scan.add_argument("--demo", action="store_true", help="Explicitly use an illustrative manifest")
+    p_scan.set_defaults(func=cmd_scan)
+
+    p_wrap = sub.add_parser("wrap", help="(advanced) Route a config's MCP servers through Elytra by hand")
+    p_wrap.add_argument("--config", help="Path to MCP client configuration JSON")
+    p_wrap.add_argument(
+        "--mode",
+        choices=["strict", "step-up", "audit"],
+        default="strict",
+        help="Runtime enforcement mode",
+    )
+    p_wrap.add_argument("--run-id", default=None, help="One explicit run shared by these tools")
+    p_wrap.add_argument("--gateway", default="http://127.0.0.1:8765")
+    p_wrap.set_defaults(func=cmd_wrap)
+
+    p_unwrap = sub.add_parser("unwrap", help="(advanced) Undo elytra wrap")
+    p_unwrap.add_argument("--config", help="Path to MCP client configuration JSON")
+    p_unwrap.set_defaults(func=cmd_unwrap)
+
+    p_proxy = sub.add_parser("proxy", help="(internal) The MCP proxy that setup installs")
+    p_proxy.add_argument("--server-name", default="mcp", help="Logical MCP server identifier")
+    p_proxy.add_argument(
+        "--mode", choices=["strict", "step-up", "audit"], default="strict", help="Enforcement mode"
+    )
+    p_proxy.add_argument("--user-prompt", default="", help="Optional initial user intent anchor")
+    p_proxy.add_argument("--telemetry-log", help="Optional path to JSONL telemetry output")
+    p_proxy.add_argument("target", nargs=argparse.REMAINDER, help="Target command after `--`")
+    p_proxy.add_argument("--run-id", default=None)
+    p_proxy.add_argument("--host-id", default=None, help="Host-session mode: the agent host credential id (its token is read from ~/.elytra/hosts)")
+    p_proxy.add_argument("--gateway", default="http://127.0.0.1:8765")
+    p_proxy.set_defaults(func=cmd_proxy)
+
+    p_bench = sub.add_parser("bench", help="(advanced) Run the recorded attack fixtures")
+    p_bench.add_argument("--suite", choices=["observed", "top50", "flagship"], default="observed")
+    p_bench.add_argument("--format", choices=["table", "json", "markdown"], default="table")
+    p_bench.add_argument("--output", help="Optional report JSON output path")
+    p_bench.set_defaults(func=cmd_bench)
+
+    from mirage_mcp.cloud import cli as cloud_cli
+    from mirage_mcp.cloud.client import DEFAULT_CREDENTIAL_FILE
+    p_login = sub.add_parser('login', help='(teams) Enroll this runtime in a team-managed workspace')
+    p_login.add_argument('--cloud-url', required=True, help='Your Elytra HTTPS deployment origin')
+    p_login.add_argument('--device-name')
+    p_login.add_argument('--code', action='store_true', help='Print a one-time code for manual enrollment instead of opening a browser')
+    p_login.add_argument('--credential-file', default=str(DEFAULT_CREDENTIAL_FILE))
+    p_login.set_defaults(func=cloud_cli.login)
+    p_logout = sub.add_parser('logout', help='(teams) Remove this machine\'s team enrollment')
     p_logout.add_argument('--credential-file', default=str(DEFAULT_CREDENTIAL_FILE))
     p_logout.add_argument('--gateway', default='http://127.0.0.1:8765')
     p_logout.add_argument('--token-file', default=str(Path.home()/'.elytra/control-plane.token'))
     p_logout.set_defaults(func=cloud_cli.logout)
-    p_cloud = sub.add_parser('cloud', help='Inspect hosted enrollment')
+    p_cloud = sub.add_parser('cloud', help='(teams) Show this machine\'s hosted enrollment')
     cloud_sub = p_cloud.add_subparsers(dest='cloud_command', required=True)
     p_status = cloud_sub.add_parser('status')
     p_status.add_argument('--credential-file', default=str(DEFAULT_CREDENTIAL_FILE))
     p_status.set_defaults(func=cloud_cli.status)
-    from mirage_mcp.cli import setup as setup_cli
-    setup_cli.register(sub)
     return parser
 
 

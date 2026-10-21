@@ -125,8 +125,7 @@ def wrap_entry(server: ServerEntry, host_id: str, host_token: str, gateway: str)
     launcher, prefix = proxy_launch(server.name, host_id, gateway)
     entry["command"] = launcher
     entry["args"] = [*prefix, command, *args]
-    entry["env"] = {**entry.get("env", {}), "ELYTRA_HOST_TOKEN": host_token}
-    entry[HOST_MARK] = host_id
+    entry[HOST_MARK] = host_id  # The proxy reads the host credential from ~/.elytra/hosts, never from this file.
     return True
 
 

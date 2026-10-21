@@ -85,6 +85,14 @@ def _identifier(value: Any, label: str) -> str:
     return value
 
 
+def _policy_reason(policy: dict, blocked: bool) -> str:
+    """A reason a person can act on. Guardrail presets explain themselves; an operator's own rule is named."""
+    if str(policy.get("rule_id", "")).startswith("guardrail.") and policy.get("description"):
+        return str(policy["description"]).rstrip(".")
+    name = policy.get("name") or policy.get("rule_id") or "a policy"
+    return f'Blocked by your rule "{name}"' if blocked else f'Your rule "{name}" asks you to approve this action'
+
+
 def _atomic(method):
     @functools.wraps(method)
     def call(self, *args, **kwargs):
@@ -580,9 +588,9 @@ class RuntimeService:
                 action = policy["action"] if policy else None
                 call["rule_id"] = policy["rule_id"] if policy else None
                 if action == "BLOCK_SECOND_HOP":
-                    reason = "Blocked by operator policy"
+                    reason = _policy_reason(policy, blocked=True)
                 elif action == "STEP_UP_APPROVAL":
-                    reason, status, event_decision = "Operator policy requires approval for this exact action", "PENDING", "STEP_UP_REQUIRED"
+                    reason, status, event_decision = _policy_reason(policy, blocked=False), "PENDING", "STEP_UP_REQUIRED"
                 elif granted or action in {"REDACT_AND_ALLOW", "AUDIT_ONLY"}:
                     reason, status, event_decision = "Explicit operator grant" if granted else "Explicit operator policy", "READY", "ALLOW"
                 else:
@@ -623,7 +631,7 @@ class RuntimeService:
         if not run or run["status"] != "ACTIVE" or run["expires_at_epoch"] <= time.time() or not call or call["status"] != "PENDING" or not self._valid_binding(call):
             raise RuntimeConflictError("Approval expired or its run, schema or policy changed")
         approval.update(status=status, resolved_at=_now(), resolved_by=self._redact(str(actor)[:256]).redacted_payload)
-        call.update(status="APPROVED" if status == "APPROVED" else "DENIED", reason="Owner approved exact action" if status == "APPROVED" else "Owner denied action")
+        call.update(status="APPROVED" if status == "APPROVED" else "DENIED", reason="You approved this exact action" if status == "APPROVED" else "You denied it")
         if status == "DENIED":
             approval["arguments_preview"] = {}
         self._put("approvals", approval_id, approval)
@@ -715,7 +723,8 @@ class RuntimeService:
     def _approval_view(self, approval: dict, call: dict | None = None) -> dict:
         if call is None:
             call = self._get("calls", self._call_key(approval["run_id"], approval["call_id"]))
-        return {**approval,
+        run = self._get("runs", approval["run_id"]) or {}
+        return {**approval, "agent": run.get("host_label") or "Python integration",
                 "expires_at": datetime.fromtimestamp(approval["expires_at_epoch"], timezone.utc).isoformat(),
                 "execution_status": call["status"] if call else "INVALIDATED"}
 

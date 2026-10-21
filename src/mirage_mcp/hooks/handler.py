@@ -102,6 +102,24 @@ def _normalize(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]", "_", name)
 
 
+def _describe(call: HookCall, action, label: str) -> str:
+    """Name the action the way the person would: the command, the file, or the MCP tool."""
+    command = call.tool_input.get("command") or call.tool_input.get("cmd")
+    if isinstance(command, list):
+        command = " ".join(str(part) for part in command)
+    if isinstance(command, str) and command.strip():
+        text = " ".join(command.split())
+        return "`" + (text if len(text) <= 80 else text[:77] + "...") + "`"
+    path = call.tool_input.get("file_path") or call.tool_input.get("path")
+    if action.kind == "builtin" and isinstance(path, str) and path:
+        verb = {"edit_files": "Editing", "delete_files": "Deleting"}.get(action.tool, "Changing")
+        return f"{verb} {Path(path).name}"
+    url = call.tool_input.get("url")
+    if action.kind == "builtin" and isinstance(url, str) and url:
+        return f"Fetching {url[:80]}"
+    return label
+
+
 def decide(call: HookCall, host: dict | None, open_session: Callable[[dict], object], sleep=time.sleep) -> Verdict:
     from mirage_mcp.sdk import RuntimeAPIError
 
@@ -126,19 +144,20 @@ def decide(call: HookCall, host: dict | None, open_session: Callable[[dict], obj
             return Verdict("none", benign=action.kind == "builtin" and action.tool in {"read_local", "web_read"})
         reason = decision.get("reason") or "Not authorized by Elytra"
         label = f"{server}.{tool}"
+        what = _describe(call, action, label)
         if decision["decision"] == "BLOCK":
             if reason.startswith("Tool is unknown"):
                 if interactive:
                     return Verdict("ask", f"Elytra has not classified {label}. Approve only if you expect this action; classify it in the Elytra console to stop being asked.")
                 return Verdict("deny", f"Elytra: {label} is not classified yet. Classify it in the Elytra console (Tool integrity), then retry.")
-            return Verdict("deny", f"Elytra blocked {label}: {reason}.")
+            return Verdict("deny", f"Elytra blocked {what}. {reason}.")
         # Held for a decision.
         if interactive:
             try:
                 client.cancel(call.call_id)
             except RuntimeAPIError:
                 pass
-            return Verdict("ask", f"Elytra: {reason}. {label} needs your decision.")
+            return Verdict("ask", f"Elytra: {what}. {reason}.")
         deadline = time.monotonic() + float(host.get("approval_window", 600))
         while time.monotonic() < deadline:
             sleep(1.0)
@@ -147,12 +166,12 @@ def decide(call: HookCall, host: dict | None, open_session: Callable[[dict], obj
                 client.claim(call.call_id, status["permit"], action.arguments)
                 return Verdict("none")
             if status["decision"] != "STEP_UP":
-                return Verdict("deny", f"Elytra: {label} was not approved ({status.get('reason', status.get('status', 'denied'))}).")
+                return Verdict("deny", f"Elytra: {what} was not approved ({status.get('reason', status.get('status', 'denied'))}).")
         try:
             client.cancel(call.call_id)
         except RuntimeAPIError:
             pass
-        return Verdict("deny", f"Elytra: {label} waited for approval and expired. Review it in the Elytra console, then retry.")
+        return Verdict("deny", f"Elytra: {what} waited for your decision and expired. Review it in the Elytra console, then retry.")
     except RuntimeAPIError as exc:
         if exc.status == 0:
             if host.get("fail_closed"):
